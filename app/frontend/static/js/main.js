@@ -7,6 +7,7 @@ import { ColumnVisibility } from './components/table/ColumnVisibility.js';
 import { InvestmentChart } from './components/chart/InvestmentChart.js';
 import { ReturnComparisonChart } from './components/chart/ReturnComparisonChart.js';
 import { NetProfitRentalIncomeChart } from './components/chart/NetProfitRentalIncomeChart.js';
+import { CrossScenarioChart } from './components/chart/CrossScenarioChart.js';
 import { ValidationBanner } from './components/ValidationBanner.js';
 import { InvestmentSummary } from './components/InvestmentSummary.js';
 import { ScenarioTabs } from './components/scenario/ScenarioTabs.js';
@@ -45,6 +46,16 @@ class InvestmentCalculator {
         const performanceContainer = document.createElement('div');
         performanceContainer.className = 'performance-wrapper';
         middleContent.appendChild(performanceContainer);
+        
+        // Create cross-scenario chart container (above display tabs)
+        const crossScenarioChartContainer = document.createElement('div');
+        crossScenarioChartContainer.className = 'cross-scenario-chart-wrapper';
+        crossScenarioChartContainer.style.cssText = `
+            height: 500px;
+            margin-bottom: 1rem;
+            min-height: 500px;
+        `;
+        middleContent.appendChild(crossScenarioChartContainer);
         
         // Create display tabs container for charts, table, and insights
         const displayTabsContainer = document.createElement('div');
@@ -91,6 +102,9 @@ class InvestmentCalculator {
         // Initialize summary for performance section (shared across all scenarios)
         this.summary = new InvestmentSummary(null, performanceContainer);
         
+        // Initialize cross-scenario chart
+        this.crossScenarioChart = new CrossScenarioChart(crossScenarioChartContainer);
+        
         // Initialize sidebar
         this.sidebar = new Sidebar(sidebarContainer);
         
@@ -101,6 +115,8 @@ class InvestmentCalculator {
         requestAnimationFrame(() => {
             setTimeout(() => {
                 this.initializeDisplayTabs();
+                // Update cross-scenario chart with scenario list
+                this.updateCrossScenarioChart();
                 // Initial calculation for all scenarios
                 this.performCalculationForAllScenarios();
             }, 200);
@@ -250,12 +266,17 @@ class InvestmentCalculator {
                     setTimeout(() => {
                         // Force save again to make absolutely sure it's persisted
                         this.scenarioTabs.saveScenarios();
+                        // Update cross-scenario chart with new scenario
+                        this.updateCrossScenarioChart();
                         // Force calculation to ensure it runs (change events should have triggered it, but ensure it happens)
                         // Wait a bit more to ensure display tab components are fully initialized
                         setTimeout(() => {
                             this.performCalculationForScenario(newTabIndex);
                         }, 100);
                     }, 450);
+                } else {
+                    // Update cross-scenario chart even if tab isn't ready yet
+                    this.updateCrossScenarioChart();
                 }
             }
         };
@@ -298,6 +319,9 @@ class InvestmentCalculator {
             // Skip the deleted index
         });
         this.scenarioData = newScenarioData;
+        
+        // Update cross-scenario chart
+        this.updateCrossScenarioChart();
         
         // Recalculate all remaining scenarios
         this.performCalculationForAllScenarios();
@@ -454,6 +478,9 @@ class InvestmentCalculator {
             
             // Update performance section (shows all scenarios)
             this.updatePerformanceSection();
+            
+            // Update cross-scenario chart
+            this.updateCrossScenarioChart();
         }
         catch (error) {
             console.error('Calculation error:', error);
@@ -515,6 +542,29 @@ class InvestmentCalculator {
         
         // Update performance section with all scenarios
         this.summary.updateMultipleScenarios(scenariosData);
+        
+        // Update cross-scenario chart
+        this.updateCrossScenarioChart();
+    }
+    
+    updateCrossScenarioChart() {
+        if (!this.crossScenarioChart) return;
+        
+        const scenarioCount = this.scenarioTabs.getScenarioCount();
+        const scenarioNames = new Map();
+        
+        // Get scenario names
+        for (let i = 0; i < scenarioCount; i++) {
+            const tab = this.scenarioTabs.getTab(i);
+            const name = tab ? tab.name || `Scenario ${i + 1}` : `Scenario ${i + 1}`;
+            scenarioNames.set(i, name);
+        }
+        
+        // Update scenario list
+        this.crossScenarioChart.updateScenarioList(scenarioCount, scenarioNames);
+        
+        // Update scenario data
+        this.crossScenarioChart.updateScenarioData(this.scenarioData);
     }
 
     getTab(scenarioIndex) {

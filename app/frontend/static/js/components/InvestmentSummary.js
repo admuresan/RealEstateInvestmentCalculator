@@ -99,6 +99,18 @@ export class InvestmentSummary {
         const expectedReturnNet = cumulativeExpectedReturn - totalInvestment;
         const expectedReturnPercent = totalInvestment > 0 ? ((expectedReturnNet / totalInvestment) * 100) : 0;
         
+        // Calculate net profit summary for the last year (sum of all 12 months of the last year)
+        // This is the summary row value for the last year
+        const lastYearStartMonth = (numYears - 1) * 12;
+        const lastYearEndMonth = Math.min(numYears * 12 - 1, results.length - 1);
+        let netProfitSummary = 0;
+        for (let month = lastYearStartMonth; month <= lastYearEndMonth; month++) {
+            const monthResult = results.find(r => r.month === month);
+            if (monthResult) {
+                netProfitSummary += (monthResult.net_profit || 0);
+            }
+        }
+        
         // Build Overall Performance HTML (for top container)
         // If scenarioNumber is provided, this is a single scenario row
         // Otherwise, it's the full performance section
@@ -107,32 +119,38 @@ export class InvestmentSummary {
                 <h4 class="summary-section-title">📊 Overall Performance</h4>
                 <div class="summary-metrics">
                     <div class="summary-metric">
-                        <span class="metric-label">Total Return:</span>
+                        <span class="metric-label">Total Investment:</span>
+                        <span class="metric-value">${this.formatCurrency(totalInvestment)}</span>
+                    </div>
+                    <div class="summary-metric">
+                        <span class="metric-label">Net Profit:</span>
+                        <span class="metric-value ${netProfitSummary >= 0 ? 'positive' : 'negative'}">
+                            ${this.formatCurrency(netProfitSummary)}
+                        </span>
+                    </div>
+                    <div class="summary-metric">
+                        <span class="metric-label">Return if Sold:</span>
                         <span class="metric-value ${totalReturn >= 0 ? 'positive' : 'negative'}">
                             ${this.formatCurrency(totalReturn)}
                         </span>
                     </div>
                     <div class="summary-metric">
-                        <span class="metric-label">Return Percentage:</span>
+                        <span class="metric-label">Return %:</span>
                         <span class="metric-value ${returnPercent >= 0 ? 'positive' : 'negative'}">
                             ${returnPercent.toFixed(2)}%
                         </span>
                     </div>
                     <div class="summary-metric">
-                        <span class="metric-label">Expected Return:</span>
+                        <span class="metric-label">Expected Investment Return:</span>
                         <span class="metric-value ${cumulativeExpectedReturn >= 0 ? 'positive' : 'negative'}">
                             ${this.formatCurrency(cumulativeExpectedReturn)}
                         </span>
                     </div>
                     <div class="summary-metric">
-                        <span class="metric-label">Return Comparison:</span>
+                        <span class="metric-label">Comparison:</span>
                         <span class="metric-value ${returnComparison < 1 ? 'negative' : returnComparison > 1 ? 'positive' : ''}">
                             ${returnComparison.toFixed(4)}x
                         </span>
-                    </div>
-                    <div class="summary-metric">
-                        <span class="metric-label">Total Investment:</span>
-                        <span class="metric-value">${this.formatCurrency(totalInvestment)}</span>
                     </div>
                 </div>
             </div>
@@ -166,6 +184,137 @@ export class InvestmentSummary {
         if (this.contentContainer) {
             this.contentContainer.innerHTML = summaryHTML;
         }
+    }
+
+    /**
+     * Calculate metrics for a specific year interval
+     */
+    calculateMetricsForYear(results, inputValues, targetYear) {
+        // Find the result at the target year (12 months per year)
+        // Use the last month of the target year (month = targetYear * 12 - 1)
+        // Year 5 would be months 48-59, so last month is 59 = 5 * 12 - 1
+        const targetMonth = targetYear * 12 - 1;
+        const yearResult = results.find(r => r.month === targetMonth) || 
+                          results[Math.min(targetMonth, results.length - 1)];
+        
+        if (!yearResult) return null;
+        
+        const purchasePrice = inputValues.get('purchase_price') || 0;
+        const downpaymentPercent = inputValues.get('downpayment_percentage') || 0;
+        const downpayment = purchasePrice * (downpaymentPercent / 100);
+        
+        // Calculate total investment up to this year
+        // Total investment = downpayment + sum of all negative net profits up to this point
+        let totalInvestment = downpayment;
+        results.forEach(result => {
+            if (result.month <= targetMonth && result.net_profit < 0) {
+                totalInvestment += Math.abs(result.net_profit);
+            }
+        });
+        
+        // Use sale_net from backend which is already calculated as sale_gross - cumulative_investment
+        // But we need to recalculate using our totalInvestment calculation for consistency
+        const saleGross = yearResult.sale_gross || 0;
+        const saleNet = saleGross - totalInvestment;
+        const totalReturn = saleNet;
+        const returnPercent = totalInvestment > 0 ? (totalReturn / totalInvestment) * 100 : 0;
+        const returnComparison = yearResult.return_comparison || 0;
+        const cumulativeExpectedReturn = yearResult.cumulative_expected_return || 0;
+        
+        // Calculate net profit summary for this year (sum of all 12 months in that year)
+        // This is the summary row value - sum net_profit for months in this year
+        // Year 5 = months 48-59 (12 months), Year 10 = months 108-119, etc.
+        const yearStartMonth = (targetYear - 1) * 12; // Year 5 starts at month 48 (4*12)
+        const yearEndMonth = targetYear * 12 - 1; // Year 5 ends at month 59 (5*12-1)
+        let netProfitSummary = 0;
+        for (let month = yearStartMonth; month <= yearEndMonth && month < results.length; month++) {
+            const monthResult = results.find(r => r.month === month);
+            if (monthResult) {
+                netProfitSummary += (monthResult.net_profit || 0);
+            }
+        }
+        
+        return {
+            year: targetYear,
+            totalReturn,
+            returnPercent,
+            cumulativeExpectedReturn,
+            returnComparison,
+            totalInvestment,
+            netProfit: netProfitSummary
+        };
+    }
+
+    /**
+     * Generate 5-year interval data for a metric
+     */
+    generateIntervalData(results, inputValues, metricType) {
+        const numYears = Math.max(1, Math.floor(results.length / 12));
+        const intervals = [];
+        
+        for (let year = 5; year <= numYears; year += 5) {
+            const metrics = this.calculateMetricsForYear(results, inputValues, year);
+            if (metrics) {
+                intervals.push(metrics);
+            }
+        }
+        
+        return intervals;
+    }
+
+    /**
+     * Build 5-year interval data table for a scenario
+     */
+    buildIntervalDataTable(results, inputValues) {
+        const intervals = this.generateIntervalData(results, inputValues, 'all');
+        
+        if (!intervals || intervals.length === 0) {
+            return '<div class="no-interval-data">No 5-year interval data available</div>';
+        }
+        
+        // Build table header
+        const tableHTML = `
+            <table class="interval-data-table">
+                <thead>
+                    <tr>
+                        <th>Year</th>
+                        <th>Total Investment</th>
+                        <th>Net Profit</th>
+                        <th>Return if Sold</th>
+                        <th>Return %</th>
+                        <th>Expected Investment Return</th>
+                        <th>Comparison</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${intervals.map(interval => `
+                        <tr>
+                            <td class="interval-year">Year ${interval.year}</td>
+                            <td class="metric-value">
+                                ${this.formatCurrency(interval.totalInvestment)}
+                            </td>
+                            <td class="metric-value ${interval.netProfit >= 0 ? 'positive' : 'negative'}">
+                                ${this.formatCurrency(interval.netProfit)}
+                            </td>
+                            <td class="metric-value ${interval.totalReturn >= 0 ? 'positive' : 'negative'}">
+                                ${this.formatCurrency(interval.totalReturn)}
+                            </td>
+                            <td class="metric-value ${interval.returnPercent >= 0 ? 'positive' : 'negative'}">
+                                ${interval.returnPercent.toFixed(2)}%
+                            </td>
+                            <td class="metric-value ${interval.cumulativeExpectedReturn >= 0 ? 'positive' : 'negative'}">
+                                ${this.formatCurrency(interval.cumulativeExpectedReturn)}
+                            </td>
+                            <td class="metric-value ${interval.returnComparison < 1 ? 'negative' : interval.returnComparison > 1 ? 'positive' : ''}">
+                                ${interval.returnComparison.toFixed(4)}x
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+        
+        return tableHTML;
     }
 
     /**
@@ -203,38 +352,66 @@ export class InvestmentSummary {
             const returnComparison = finalResult.return_comparison || 0;
             const cumulativeExpectedReturn = finalResult.cumulative_expected_return || 0;
             
+            // Calculate net profit summary for the last year (sum of all 12 months of the last year)
+            // This is the summary row value for the last year
+            const numYears = Math.max(1, Math.floor(results.length / 12));
+            const lastYearStartMonth = (numYears - 1) * 12;
+            const lastYearEndMonth = Math.min(numYears * 12 - 1, results.length - 1);
+            let netProfitSummary = 0;
+            for (let month = lastYearStartMonth; month <= lastYearEndMonth; month++) {
+                const monthResult = results.find(r => r.month === month);
+                if (monthResult) {
+                    netProfitSummary += (monthResult.net_profit || 0);
+                }
+            }
+            
             return `
-                <div class="scenario-performance-row">
-                    <div class="scenario-number">Scenario ${index + 1}</div>
-                    <div class="scenario-metrics">
-                        <div class="summary-metric">
-                            <span class="metric-label">Total Return:</span>
-                            <span class="metric-value ${totalReturn >= 0 ? 'positive' : 'negative'}">
-                                ${this.formatCurrency(totalReturn)}
-                            </span>
+                <div class="expandable-scenario-row" data-scenario-index="${index}">
+                    <div class="scenario-performance-row">
+                        <div class="scenario-number expandable-scenario-header">
+                            <span class="scenario-name">Scenario ${index + 1}</span>
+                            <span class="expand-icon">▼</span>
                         </div>
-                        <div class="summary-metric">
-                            <span class="metric-label">Return %:</span>
-                            <span class="metric-value ${returnPercent >= 0 ? 'positive' : 'negative'}">
-                                ${returnPercent.toFixed(2)}%
-                            </span>
+                        <div class="scenario-metrics">
+                            <div class="summary-metric">
+                                <span class="metric-label">Total Investment:</span>
+                                <span class="metric-value">${this.formatCurrency(totalInvestment)}</span>
+                            </div>
+                            <div class="summary-metric">
+                                <span class="metric-label">Net Profit:</span>
+                                <span class="metric-value ${netProfitSummary >= 0 ? 'positive' : 'negative'}">
+                                    ${this.formatCurrency(netProfitSummary)}
+                                </span>
+                            </div>
+                            <div class="summary-metric">
+                                <span class="metric-label">Return if Sold:</span>
+                                <span class="metric-value ${totalReturn >= 0 ? 'positive' : 'negative'}">
+                                    ${this.formatCurrency(totalReturn)}
+                                </span>
+                            </div>
+                            <div class="summary-metric">
+                                <span class="metric-label">Return %:</span>
+                                <span class="metric-value ${returnPercent >= 0 ? 'positive' : 'negative'}">
+                                    ${returnPercent.toFixed(2)}%
+                                </span>
+                            </div>
+                            <div class="summary-metric">
+                                <span class="metric-label">Expected Investment Return:</span>
+                                <span class="metric-value ${cumulativeExpectedReturn >= 0 ? 'positive' : 'negative'}">
+                                    ${this.formatCurrency(cumulativeExpectedReturn)}
+                                </span>
+                            </div>
+                            <div class="summary-metric">
+                                <span class="metric-label">Comparison:</span>
+                                <span class="metric-value ${returnComparison < 1 ? 'negative' : returnComparison > 1 ? 'positive' : ''}">
+                                    ${returnComparison.toFixed(4)}x
+                                </span>
+                            </div>
                         </div>
-                        <div class="summary-metric">
-                            <span class="metric-label">Expected Return:</span>
-                            <span class="metric-value ${cumulativeExpectedReturn >= 0 ? 'positive' : 'negative'}">
-                                ${this.formatCurrency(cumulativeExpectedReturn)}
-                            </span>
-                        </div>
-                        <div class="summary-metric">
-                            <span class="metric-label">Comparison:</span>
-                            <span class="metric-value ${returnComparison < 1 ? 'negative' : returnComparison > 1 ? 'positive' : ''}">
-                                ${returnComparison.toFixed(4)}x
-                            </span>
-                        </div>
-                        <div class="summary-metric">
-                            <span class="metric-label">Total Investment:</span>
-                            <span class="metric-value">${this.formatCurrency(totalInvestment)}</span>
-                        </div>
+                    </div>
+                    <div class="scenario-interval-content">
+                        <h5 class="interval-content-title">5-Year Interval Breakdown</h5>
+                        ${this.buildIntervalDataTable(results, inputValues)}
                     </div>
                 </div>
             `;
@@ -250,6 +427,17 @@ export class InvestmentSummary {
         `;
 
         this.performanceContent.innerHTML = performanceHTML;
+        
+        // Add click event listeners to expandable scenario headers
+        const expandableHeaders = this.performanceContent.querySelectorAll('.expandable-scenario-header');
+        expandableHeaders.forEach(header => {
+            header.addEventListener('click', () => {
+                const expandableScenario = header.closest('.expandable-scenario-row');
+                if (expandableScenario) {
+                    expandableScenario.classList.toggle('expanded');
+                }
+            });
+        });
     }
 
     generateInsights(finalResult, totalReturn, returnPercent, returnComparison, expectedReturnRate, cumulativeExpectedReturn, homeValue, purchasePrice, numYears, downpayment) {
