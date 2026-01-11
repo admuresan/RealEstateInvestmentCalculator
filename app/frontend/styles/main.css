@@ -1302,7 +1302,7 @@ body {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    min-height: 0;
+    min-height: 95%;
 }
 
 .scenario-tab-content .input-sidebar {
