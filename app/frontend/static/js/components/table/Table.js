@@ -6,7 +6,7 @@ import { YearGroupRow } from './YearGroupRow.js';
 import { FormulaModal } from '../FormulaModal.js';
 import { COLUMN_DEFINITIONS } from '../sidebar/ColumnInfo.js';
 export class Table {
-    constructor(parent, inputGroups) {
+    constructor(parent, inputGroups, tabIndex = 0) {
         this.rows = [];
         this.yearGroups = [];
         this.inputGroups = new Map();
@@ -14,6 +14,7 @@ export class Table {
         this.isLoadingConfiguration = false;
         this.formulaModal = new FormulaModal();
         this.columnDefinitions = COLUMN_DEFINITIONS;
+        this.tabIndex = tabIndex;
         this.columns = [
             'month',
             'principal_remaining',
@@ -30,7 +31,8 @@ export class Table {
             'rental_income',
             'taxable_income',
             'taxes_due',
-            'net_profit',
+            'rental_gains',
+            'cumulative_rental_gains',
             'cumulative_investment',
             'expected_return',
             'cumulative_expected_return',
@@ -130,6 +132,15 @@ export class Table {
         
         // Initialize all columns as visible
         this.columns.forEach(col => this.visibleColumns.add(col));
+        
+        // Load configuration for this tab immediately (synchronously for column visibility)
+        // Input values can be loaded later, but column visibility needs to be set before any data updates
+        this.loadColumnVisibility();
+        
+        // Load input values asynchronously (they don't affect column visibility)
+        requestAnimationFrame(() => {
+            this.loadInputValues();
+        });
     }
     setInputGroups(inputGroups) {
         this.inputGroups = inputGroups;
@@ -171,15 +182,42 @@ export class Table {
                 }
             });
             localStorage.setItem('calculator_inputs', JSON.stringify(inputValues));
-            // Save column visibility
+            // Save column visibility per tab
             const visibleColumnsArray = Array.from(this.visibleColumns);
-            localStorage.setItem('calculator_visible_columns', JSON.stringify(visibleColumnsArray));
+            localStorage.setItem(`calculator_visible_columns_tab_${this.tabIndex}`, JSON.stringify(visibleColumnsArray));
         }
         catch (error) {
             console.warn('Failed to save configuration:', error);
         }
     }
-    loadConfiguration() {
+    loadColumnVisibility() {
+        try {
+            // Load column visibility for this tab
+            let savedColumns = localStorage.getItem(`calculator_visible_columns_tab_${this.tabIndex}`);
+            // Fall back to old global key for backward compatibility (only for first tab)
+            if (!savedColumns && this.tabIndex === 0) {
+                savedColumns = localStorage.getItem('calculator_visible_columns');
+            }
+            if (savedColumns) {
+                const visibleColumnsArray = JSON.parse(savedColumns);
+                const visibleColumnsSet = new Set(visibleColumnsArray);
+                // Only apply if all columns in the set are valid
+                const allValid = visibleColumnsArray.every(col => this.columns.includes(col));
+                if (allValid && visibleColumnsSet.size > 0) {
+                    // Temporarily disable saving while setting visibility (skip save since we're loading)
+                    this.setColumnVisibility(visibleColumnsSet, true);
+                    // Notify callback to update checkboxes
+                    if (this.visibilityChangeCallback) {
+                        this.visibilityChangeCallback(visibleColumnsSet);
+                    }
+                }
+            }
+        }
+        catch (error) {
+            console.warn('Failed to load column visibility:', error);
+        }
+    }
+    loadInputValues() {
         this.isLoadingConfiguration = true;
         try {
             // Load input values
@@ -193,7 +231,7 @@ export class Table {
                     }
                 });
                 // Ensure downpayment display is updated after loading purchase_price
-                // The setValue on downpayment_percentage should handle this, but trigger input event to be sure
+                // The setValue on downpayment_percentage will handle this, but trigger input event to be sure
                 if (inputValues['purchase_price'] !== undefined || inputValues['downpayment_percentage'] !== undefined) {
                     const purchasePriceInput = this.inputGroups.get('purchase_price');
                     const downpaymentInput = this.inputGroups.get('downpayment_percentage');
@@ -206,31 +244,20 @@ export class Table {
                     }
                 }
             }
-            // Load column visibility
-            const savedColumns = localStorage.getItem('calculator_visible_columns');
-            if (savedColumns) {
-                const visibleColumnsArray = JSON.parse(savedColumns);
-                const visibleColumnsSet = new Set(visibleColumnsArray);
-                // Only apply if all columns in the set are valid
-                const allValid = visibleColumnsArray.every(col => this.columns.includes(col));
-                if (allValid && visibleColumnsSet.size > 0) {
-                    // Temporarily disable saving while setting visibility
-                    this.setColumnVisibility(visibleColumnsSet);
-                    // Notify callback to update checkboxes
-                    if (this.visibilityChangeCallback) {
-                        this.visibilityChangeCallback(visibleColumnsSet);
-                    }
-                }
-            }
         }
         catch (error) {
-            console.warn('Failed to load configuration:', error);
+            console.warn('Failed to load input values:', error);
         }
         finally {
             this.isLoadingConfiguration = false;
         }
     }
-    setColumnVisibility(visibleColumns) {
+    loadConfiguration() {
+        // Load both column visibility and input values
+        this.loadColumnVisibility();
+        this.loadInputValues();
+    }
+    setColumnVisibility(visibleColumns, skipSave = false) {
         this.visibleColumns = visibleColumns;
         // Update header visibility
         this.headerRow.querySelectorAll('th').forEach((th, index) => {
@@ -269,8 +296,10 @@ export class Table {
                 }
             });
         });
-        // Save column visibility
-        this.saveConfiguration();
+        // Save column visibility (unless explicitly skipped)
+        if (!skipSave) {
+            this.saveConfiguration();
+        }
     }
     setVisibilityChangeCallback(callback) {
         this.visibilityChangeCallback = callback;
@@ -295,6 +324,44 @@ export class Table {
         if (column === 'month') {
             return 'Month';
         }
+        
+        // Map column keys to display names
+        const keyToNameMap = {
+            'rental_gains': 'Rental Gains',
+            'cumulative_rental_gains': 'Cumulative Rental Gains',
+            'principal_remaining': 'Principal Remaining',
+            'mortgage_payments': 'Mortgage Payments',
+            'principal_paid': 'Principal Paid',
+            'interest_paid': 'Interest Paid',
+            'maintenance_fees': 'Maintenance Fees',
+            'property_tax': 'Property Tax',
+            'insurance_paid': 'Insurance Paid',
+            'utilities': 'Utilities',
+            'repairs': 'Repairs',
+            'total_expenses': 'Total Expenses',
+            'deductible_expenses': 'Deductible Expenses',
+            'rental_income': 'Rental Income',
+            'taxable_income': 'Taxable Income',
+            'taxes_due': 'Taxes Due',
+            'cumulative_investment': 'Cumulative Investment',
+            'expected_return': 'Expected Return',
+            'cumulative_expected_return': 'Cumulative Expected Return',
+            'home_value': 'Home Value',
+            'capital_gains_tax': 'Capital Gains Tax',
+            'sales_fees': 'Sales Fees',
+            'sale_income': 'Sale Income',
+            'sale_net': 'Sale Net',
+            'net_return': 'Net Return',
+            'return_percent': 'Return %',
+            'return_comparison': 'Return Comparison'
+        };
+        
+        // Return mapped name if available, otherwise auto-format
+        if (keyToNameMap[column]) {
+            return keyToNameMap[column];
+        }
+        
+        // Fallback to auto-formatting
         return column.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
     }
     updateData(results) {
@@ -342,8 +409,8 @@ export class Table {
                 yearGroup.addMonthRow(row.getRowElement());
             });
         });
-        // Reapply column visibility after updating data
-        this.setColumnVisibility(this.visibleColumns);
+        // Reapply column visibility after updating data (skip save to avoid overwriting saved state)
+        this.setColumnVisibility(this.visibleColumns, true);
     }
     getInputValues() {
         const values = new Map();

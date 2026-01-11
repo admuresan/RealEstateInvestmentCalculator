@@ -7,6 +7,7 @@ export class DisplayTabs {
         this.createContentCallback = createContentCallback;
         this.tabs = [];
         this.activeTabIndex = 0;
+        this.onTabActivatedCallback = null;
         
         this.container = document.createElement('div');
         this.container.className = 'display-tabs-container';
@@ -127,6 +128,15 @@ export class DisplayTabs {
     setActiveTab(index) {
         if (index < 0 || index >= this.tabs.length) return;
         
+        // Save column visibility for the previously active tab before switching
+        if (this.activeTabIndex >= 0 && this.activeTabIndex < this.tabs.length) {
+            const previousTab = this.tabs[this.activeTabIndex];
+            if (previousTab && previousTab.contentComponents && previousTab.contentComponents.table) {
+                // Save the current column visibility state
+                previousTab.contentComponents.table.saveConfiguration();
+            }
+        }
+        
         // Update active state
         this.activeTabIndex = index;
         
@@ -148,6 +158,21 @@ export class DisplayTabs {
                 tab.content.style.display = 'flex';
                 tab.content.style.visibility = 'visible';
                 tab.content.style.opacity = '1';
+                
+                // Restore column visibility for the newly active tab
+                if (tab.contentComponents && tab.contentComponents.table) {
+                    // Load column visibility for this tab (must happen before any data updates)
+                    tab.contentComponents.table.loadColumnVisibility();
+                    // Notify callback to update checkboxes (if set)
+                    if (this.onTabActivatedCallback) {
+                        // Use setTimeout to ensure visibility is loaded first
+                        setTimeout(() => {
+                            if (this.onTabActivatedCallback) {
+                                this.onTabActivatedCallback(tab.contentComponents.table.visibleColumns);
+                            }
+                        }, 0);
+                    }
+                }
                 
                 // Trigger chart resize/update when tab becomes visible
                 // Use requestAnimationFrame and setTimeout to ensure DOM has updated
@@ -356,6 +381,10 @@ export class DisplayTabs {
                 );
             }
         }
+    }
+
+    setOnTabActivatedCallback(callback) {
+        this.onTabActivatedCallback = callback;
     }
 }
 

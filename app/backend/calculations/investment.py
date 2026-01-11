@@ -142,6 +142,30 @@ def calculate_cumulative_investment(previous_cumulative: float, net_profit: floa
     return float(Decimal(str(previous_cumulative)) - Decimal(str(net_profit)))
 
 
+def calculate_cumulative_investment_new(downpayment: float, cumulative_net_profit: float) -> float:
+    """
+    Calculate cumulative investment using new approach.
+    Investment = downpayment + any losses (if cumulative net profit is negative).
+    This represents total cash invested.
+    
+    Args:
+        downpayment: Initial downpayment amount
+        cumulative_net_profit: Sum of all net profits up to this point
+    
+    Returns:
+        Cumulative investment (downpayment + losses if any)
+    """
+    dp = Decimal(str(downpayment))
+    cnp = Decimal(str(cumulative_net_profit))
+    
+    # If cumulative net profit is negative, add the absolute value to investment
+    # If positive, investment stays at downpayment
+    if cnp < 0:
+        return float(dp - cnp)  # Subtracting negative = adding absolute value
+    else:
+        return float(dp)
+
+
 def calculate_cumulative_expected_return(previous_cumulative: float, net_profit: float,
                                         expected_return_rate: float, downpayment: float,
                                         is_first_year: bool) -> float:

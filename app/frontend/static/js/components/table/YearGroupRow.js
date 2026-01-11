@@ -83,7 +83,7 @@ export class YearGroupRow {
             'mortgage_payments', 'principal_paid', 'interest_paid',
             'maintenance_fees', 'property_tax', 'insurance_paid',
             'utilities', 'repairs', 'total_expenses', 'deductible_expenses',
-            'rental_income', 'taxable_income', 'taxes_due', 'net_profit',
+            'rental_income', 'taxable_income', 'taxes_due', 'rental_gains',
             'expected_return'
         ];
         sumColumns.forEach(col => {
@@ -94,6 +94,7 @@ export class YearGroupRow {
         summary['principal_remaining'] = lastMonth.principal_remaining;
         
         // Last value columns (cumulative values, sale metrics)
+        summary['cumulative_rental_gains'] = lastMonth.cumulative_rental_gains;
         summary['cumulative_investment'] = lastMonth.cumulative_investment;
         summary['cumulative_expected_return'] = lastMonth.cumulative_expected_return;
         summary['home_value'] = lastMonth.home_value;
@@ -155,7 +156,8 @@ export class YearGroupRow {
             'rental_income': 'Rental Income',
             'taxable_income': 'Taxable Income',
             'taxes_due': 'Taxes Due',
-            'net_profit': 'Net Profit',
+            'rental_gains': 'Rental Gains',
+            'cumulative_rental_gains': 'Cumulative Rental Gains',
             'cumulative_investment': 'Cumulative Investment',
             'expected_return': 'Expected Return',
             'cumulative_expected_return': 'Cumulative Expected Return',
@@ -184,7 +186,7 @@ export class YearGroupRow {
             'mortgage_payments', 'principal_paid', 'interest_paid',
             'maintenance_fees', 'property_tax', 'insurance_paid',
             'utilities', 'repairs', 'total_expenses', 'deductible_expenses',
-            'rental_income', 'taxable_income', 'taxes_due', 'net_profit',
+            'rental_income', 'taxable_income', 'taxes_due', 'rental_gains',
             'expected_return'
         ];
         

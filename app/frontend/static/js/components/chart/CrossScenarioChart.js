@@ -22,7 +22,7 @@ export class CrossScenarioChart {
             'rental_income',
             'taxable_income',
             'taxes_due',
-            'net_profit',
+            'rental_gains',
             'cumulative_investment',
             'expected_return',
             'cumulative_expected_return',

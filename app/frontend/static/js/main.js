@@ -12,12 +12,19 @@ import { ValidationBanner } from './components/ValidationBanner.js';
 import { InvestmentSummary } from './components/InvestmentSummary.js';
 import { ScenarioTabs } from './components/scenario/ScenarioTabs.js';
 import { DisplayTabs } from './components/scenario/DisplayTabs.js';
+import { LoadingOverlay } from './components/LoadingOverlay.js';
 import { calculateInvestment } from './utils/api.js';
 
 class InvestmentCalculator {
     constructor() {
         this.numYears = 30;
         this.scenarioData = new Map(); // Map of scenario index to { results, inputValues }
+        this.calculationInProgress = false;
+        this.pendingCalculations = 0;
+        
+        // Initialize loading overlay first
+        this.loadingOverlay = new LoadingOverlay();
+        this.loadingOverlay.show('Initializing...', 'Setting up the calculator');
         
         const appContainer = document.getElementById('app');
         if (!appContainer) {
@@ -101,6 +108,13 @@ class InvestmentCalculator {
             return this.createDisplayTabContent(container, tabIndex);
         });
         
+        // Set up callback to update column visibility checkboxes when switching tabs
+        this.displayTabs.setOnTabActivatedCallback((visibleColumns) => {
+            if (this.columnVisibility) {
+                this.columnVisibility.setColumnVisibility(visibleColumns);
+            }
+        });
+        
         // Initialize summary for performance section (shared across all scenarios)
         this.summary = new InvestmentSummary(null, performanceContainer);
         
@@ -116,6 +130,7 @@ class InvestmentCalculator {
         // Wait for scenarios to load, then create display tabs
         requestAnimationFrame(() => {
             setTimeout(() => {
+                this.loadingOverlay.updateMessage('Loading scenarios...', 'Preparing your data');
                 this.initializeDisplayTabs();
                 // Update cross-scenario chart with scenario list
                 this.updateCrossScenarioChart();
@@ -173,7 +188,7 @@ class InvestmentCalculator {
         const chart = new InvestmentChart(chartContainer);
         const returnChart = new ReturnComparisonChart(returnChartContainer);
         const netProfitRentalChart = new NetProfitRentalIncomeChart(netProfitRentalChartContainer);
-        const table = new Table(tableContainer);
+        const table = new Table(tableContainer, null, tabIndex);
         
         // Get input sidebar for this scenario to set up table
         // Use setTimeout to ensure scenario tab is created first
@@ -193,12 +208,11 @@ class InvestmentCalculator {
             // Insert into sidebar wrapper before the column info container
             this.sidebar.wrapper.insertBefore(visibilityContainer, this.sidebar.columnInfoContainer);
             this.columnVisibility = new ColumnVisibility(visibilityContainer, table.getColumns(), (visibleColumns) => {
-                // Update visibility for all tables
-                this.displayTabs.tabs.forEach(tab => {
-                    if (tab.contentComponents && tab.contentComponents.table) {
-                        tab.contentComponents.table.setColumnVisibility(visibleColumns);
-                    }
-                });
+                // Update visibility only for the active display tab
+                const activeTab = this.displayTabs.getActiveTab();
+                if (activeTab && activeTab.contentComponents && activeTab.contentComponents.table) {
+                    activeTab.contentComponents.table.setColumnVisibility(visibleColumns);
+                }
             });
             
             // Set up callback so header icon clicks update checkboxes
@@ -207,6 +221,14 @@ class InvestmentCalculator {
                     this.columnVisibility.setColumnVisibility(visibleColumns);
                 }
             });
+            
+            // Update checkboxes to reflect loaded column visibility state
+            // Use setTimeout to ensure table has finished loading configuration
+            setTimeout(() => {
+                if (this.columnVisibility && table.visibleColumns) {
+                    this.columnVisibility.setColumnVisibility(table.visibleColumns);
+                }
+            }, 100);
         }
         
         return {
@@ -238,6 +260,7 @@ class InvestmentCalculator {
         // Override handleAddTab to also create display tab
         const originalHandleAddTab = this.scenarioTabs.handleAddTab.bind(this.scenarioTabs);
         this.scenarioTabs.handleAddTab = async () => {
+            this.loadingOverlay.show('Adding scenario...', 'Setting up new scenario');
             await originalHandleAddTab();
             // After tab is added, set up the new tab
             const newTabIndex = this.scenarioTabs.getScenarioCount() - 1;
@@ -279,6 +302,7 @@ class InvestmentCalculator {
                 } else {
                     // Update cross-scenario chart even if tab isn't ready yet
                     this.updateCrossScenarioChart();
+                    this.loadingOverlay.hide();
                 }
             }
         };
@@ -306,6 +330,8 @@ class InvestmentCalculator {
     }
 
     handleScenarioDeleted(deletedIndex) {
+        this.loadingOverlay.show('Updating scenarios...', 'Removing scenario and recalculating');
+        
         // Remove corresponding display tab
         this.displayTabs.removeTab(deletedIndex);
         
@@ -389,7 +415,19 @@ class InvestmentCalculator {
 
     async performCalculationForScenario(scenarioIndex) {
         const tab = this.scenarioTabs.getTab(scenarioIndex);
-        if (!tab) return;
+        if (!tab) {
+            // Tab not found, don't show loading overlay
+            return;
+        }
+        
+        // Show loading overlay if not already showing
+        if (!this.loadingOverlay.isShowing()) {
+            this.loadingOverlay.show('Calculating...', 'Processing your investment scenario');
+        } else {
+            this.loadingOverlay.updateMessage('Calculating...', `Processing scenario ${scenarioIndex + 1}`);
+        }
+        this.calculationInProgress = true;
+        this.pendingCalculations++;
         
         const inputSidebar = tab.inputSidebar;
         const values = inputSidebar.getInputValues();
@@ -398,12 +436,32 @@ class InvestmentCalculator {
         const displayTab = this.displayTabs.getTab(scenarioIndex);
         if (!displayTab) {
             console.warn(`Display tab ${scenarioIndex} not found, skipping calculation`);
+            // Decrement pending calculations and hide overlay if needed
+            this.pendingCalculations = Math.max(0, this.pendingCalculations - 1);
+            if (this.pendingCalculations === 0) {
+                this.calculationInProgress = false;
+                setTimeout(() => {
+                    if (this.pendingCalculations === 0 && !this.calculationInProgress) {
+                        this.loadingOverlay.hide();
+                    }
+                }, 300);
+            }
             return;
         }
         
         // Ensure display tab content components are initialized
         if (!displayTab.contentComponents) {
             console.warn(`Display tab ${scenarioIndex} content components not initialized, skipping calculation`);
+            // Decrement pending calculations and hide overlay if needed
+            this.pendingCalculations = Math.max(0, this.pendingCalculations - 1);
+            if (this.pendingCalculations === 0) {
+                this.calculationInProgress = false;
+                setTimeout(() => {
+                    if (this.pendingCalculations === 0 && !this.calculationInProgress) {
+                        this.loadingOverlay.hide();
+                    }
+                }, 300);
+            }
             return;
         }
 
@@ -417,6 +475,17 @@ class InvestmentCalculator {
             // Only remove from scenarioData so it doesn't appear in performance section
             this.scenarioData.delete(scenarioIndex);
             this.updatePerformanceSection();
+            
+            // Decrement pending calculations and hide overlay if needed
+            this.pendingCalculations = Math.max(0, this.pendingCalculations - 1);
+            if (this.pendingCalculations === 0) {
+                this.calculationInProgress = false;
+                setTimeout(() => {
+                    if (this.pendingCalculations === 0 && !this.calculationInProgress) {
+                        this.loadingOverlay.hide();
+                    }
+                }, 300);
+            }
             return;
         }
 
@@ -516,21 +585,54 @@ class InvestmentCalculator {
                 this.validationBanner.show(uniqueErrors.length > 0 ? uniqueErrors : ['An unknown error occurred. Please check your inputs.']);
             }
         }
+        finally {
+            // Decrement pending calculations counter
+            this.pendingCalculations = Math.max(0, this.pendingCalculations - 1);
+            
+            // Hide loading overlay if all calculations are complete
+            if (this.pendingCalculations === 0) {
+                this.calculationInProgress = false;
+                // Small delay to ensure UI updates are complete
+                setTimeout(() => {
+                    if (this.pendingCalculations === 0 && !this.calculationInProgress) {
+                        this.loadingOverlay.hide();
+                    }
+                }, 300);
+            }
+        }
     }
 
     async performCalculationForAllScenarios() {
         const scenarioCount = this.scenarioTabs.getScenarioCount();
+        
+        if (scenarioCount === 0) {
+            // No scenarios to calculate, hide loading overlay
+            this.loadingOverlay.hide();
+            return;
+        }
+        
+        // Show loading overlay
+        this.loadingOverlay.updateMessage('Calculating scenarios...', `Processing ${scenarioCount} scenario${scenarioCount > 1 ? 's' : ''}`);
         
         // Ensure display tabs match scenario tabs
         this.displayTabs.updateTabCount(scenarioCount);
         
         // Perform calculation for each scenario
         for (let i = 0; i < scenarioCount; i++) {
+            this.loadingOverlay.updateMessage('Calculating scenarios...', `Processing scenario ${i + 1} of ${scenarioCount}`);
             await this.performCalculationForScenario(i);
         }
         
         // Ensure validation banner is shown/hidden correctly for active scenario
         this.validateAndShowBannerForScenario(this.scenarioTabs.activeTabIndex);
+        
+        // Final check to hide loading overlay
+        setTimeout(() => {
+            if (this.pendingCalculations === 0) {
+                this.calculationInProgress = false;
+                this.loadingOverlay.hide();
+            }
+        }, 500);
     }
 
     updatePerformanceSection() {

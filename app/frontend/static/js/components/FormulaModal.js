@@ -29,6 +29,12 @@ export class FormulaModal {
         this.currentFormulaContent = null;
         this.currentSvg = null;
         this.currentBreakdown = null;
+        // Original state (before any expansions)
+        this.originalColumnName = null;
+        this.originalData = null;
+        this.originalInputValues = null;
+        this.originalYearData = null;
+        this.originalBreakdown = null;
         // Mapping from labels to column keys for expansion
         this.labelToColumnKey = {
             'Sale Income': 'sale_income',
@@ -43,11 +49,24 @@ export class FormulaModal {
             'Deductible Expenses': 'deductible_expenses',
             'Taxable Income': 'taxable_income',
             'Taxes Due': 'taxes_due',
-            'Net Profit': 'net_profit',
+            'Rental Gains': 'rental_gains',
+            'Cumulative Rental Gains': 'cumulative_rental_gains',
             'Rental Income': 'rental_income',
             'Mortgage Payments': 'mortgage_payments',
             'Principal Paid': 'principal_paid',
-            'Interest Paid': 'interest_paid'
+            'Interest Paid': 'interest_paid',
+            'Maintenance': 'maintenance_fees',
+            'Property Tax': 'property_tax',
+            'Insurance': 'insurance_paid',
+            'Utilities': 'utilities',
+            'Repairs': 'repairs',
+            'Expected Return': 'expected_return',
+            'Cumulative Expected Return': 'cumulative_expected_return',
+            'Previous Cumulative Expected Return': 'cumulative_expected_return',
+            'Current Rental Gains': 'rental_gains',
+            'Previous Cumulative Rental Gains': 'cumulative_rental_gains',
+            'Cumulative Losses': 'cumulative_rental_gains',
+            'Monthly Payment': 'mortgage_payments'
         };
         this.createModal();
     }
@@ -98,6 +117,32 @@ export class FormulaModal {
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             position: relative;
         `;
+
+        // Reset button (initially hidden, shown when there are expansions)
+        this.resetButton = document.createElement('button');
+        this.resetButton.textContent = '↻ Reset';
+        this.resetButton.style.cssText = `
+            position: absolute;
+            top: 12px;
+            right: 50px;
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            display: none;
+            z-index: 10001;
+        `;
+        this.resetButton.addEventListener('mouseenter', () => {
+            this.resetButton.style.backgroundColor = '#5a6268';
+        });
+        this.resetButton.addEventListener('mouseleave', () => {
+            this.resetButton.style.backgroundColor = '#6c757d';
+        });
+        this.resetButton.addEventListener('click', () => this.resetToOriginal());
+        this.modal.appendChild(this.resetButton);
 
         // Close button
         const closeButton = document.createElement('button');
@@ -196,12 +241,20 @@ export class FormulaModal {
     }
 
     show(columnName, formula, data, inputValues, yearData = null, isExpansion = false) {
-        // If this is not an expansion, reset history
+        // If this is not an expansion, reset history and store original state
         if (!isExpansion) {
             this.expansionHistory = [];
             this.backButton.style.display = 'none';
+            this.resetButton.style.display = 'none';
+            
+            // Store original state
+            this.originalColumnName = columnName;
+            this.originalData = data;
+            this.originalInputValues = inputValues;
+            this.originalYearData = yearData;
         } else {
             this.backButton.style.display = 'block';
+            this.resetButton.style.display = 'block';
         }
         
         // Store current state
@@ -218,6 +271,11 @@ export class FormulaModal {
         // Get formula breakdown
         const breakdown = this.calculateBreakdown(columnName, data, inputValues, yearData);
         this.currentBreakdown = breakdown;
+        
+        // Store original breakdown if this is the first time showing
+        if (!isExpansion) {
+            this.originalBreakdown = breakdown;
+        }
         
         // Clear and rebuild formula section
         this.formulaSection.innerHTML = '';
@@ -735,6 +793,7 @@ export class FormulaModal {
         // Reset expansion state
         this.expansionHistory = [];
         this.backButton.style.display = 'none';
+        this.resetButton.style.display = 'none';
     }
 
     isVisible() {
@@ -750,6 +809,9 @@ export class FormulaModal {
             yearData: this.currentYearData,
             breakdown: this.currentBreakdown
         });
+        
+        // Show reset button when expanding
+        this.resetButton.style.display = 'block';
         
         // Get the column display name
         const keyToNameMap = {
@@ -767,7 +829,8 @@ export class FormulaModal {
             'rental_income': 'Rental Income',
             'taxable_income': 'Taxable Income',
             'taxes_due': 'Taxes Due',
-            'net_profit': 'Net Profit',
+            'rental_gains': 'Rental Gains',
+            'cumulative_rental_gains': 'Cumulative Rental Gains',
             'cumulative_investment': 'Cumulative Investment',
             'expected_return': 'Expected Return',
             'cumulative_expected_return': 'Cumulative Expected Return',
@@ -920,6 +983,174 @@ export class FormulaModal {
             
             this.calculateAndDrawAnnotations(formulaParts, previousState.breakdown, this.currentSvg, this.currentFormulaContainer);
         }, 50);
+        
+        // Hide reset button if we're back to original
+        if (this.expansionHistory.length === 0) {
+            this.resetButton.style.display = 'none';
+        }
+    }
+
+    resetToOriginal() {
+        if (!this.originalBreakdown) {
+            return;
+        }
+        
+        // Clear expansion history
+        this.expansionHistory = [];
+        
+        // Restore original state
+        this.currentColumnName = this.originalColumnName;
+        this.currentData = this.originalData;
+        this.currentInputValues = this.originalInputValues;
+        this.currentYearData = this.originalYearData;
+        this.currentBreakdown = this.originalBreakdown;
+        
+        // Update title
+        this.titleElement.textContent = this.originalColumnName;
+        
+        // Hide navigation buttons
+        this.backButton.style.display = 'none';
+        this.resetButton.style.display = 'none';
+        
+        // Clear and rebuild entire formula section (including result display)
+        this.formulaSection.innerHTML = '';
+        this.labelColorMap.clear();
+        
+        // Rebuild formula container
+        const formulaContainer = document.createElement('div');
+        formulaContainer.style.cssText = `
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            padding: 120px 24px 40px 24px;
+            position: relative;
+            min-height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: visible;
+        `;
+        this.currentFormulaContainer = formulaContainer;
+        
+        // Create SVG for drawing annotation lines
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+            overflow: visible;
+        `;
+        formulaContainer.appendChild(svg);
+        this.currentSvg = svg;
+        
+        // Create formula content container
+        const formulaContent = document.createElement('div');
+        formulaContent.style.cssText = `
+            position: relative;
+            z-index: 2;
+            font-size: 14px;
+            line-height: 1.5;
+            white-space: nowrap;
+            overflow: visible;
+            display: inline-block;
+            text-align: center;
+            width: 100%;
+        `;
+        this.currentFormulaContent = formulaContent;
+        
+        // Build formula with annotated values
+        const formulaParts = this.buildAnnotatedFormula(
+            this.originalBreakdown,
+            formulaContent,
+            svg,
+            formulaContainer,
+            this.originalData,
+            this.originalInputValues,
+            this.originalYearData
+        );
+        
+        formulaContainer.appendChild(formulaContent);
+        this.formulaSection.appendChild(formulaContainer);
+        
+        // Ensure formula fits on one line
+        const ensureFormulaFits = () => {
+            const containerWidth = formulaContainer.getBoundingClientRect().width - 48;
+            const contentWidth = formulaContent.scrollWidth;
+            
+            if (contentWidth > containerWidth) {
+                const currentSize = parseFloat(formulaContent.style.fontSize) || 14;
+                const newSize = Math.max(10, currentSize * (containerWidth / contentWidth) * 0.95);
+                formulaContent.style.fontSize = `${newSize}px`;
+            }
+        };
+        
+        // Setup resize observer
+        if (this.resizeObserver) {
+            this.resizeObserver.disconnect();
+        }
+        this.resizeObserver = new ResizeObserver(() => {
+            ensureFormulaFits();
+            this.calculateAndDrawAnnotations(formulaParts, this.originalBreakdown, svg, formulaContainer);
+        });
+        this.resizeObserver.observe(formulaContainer);
+        
+        // Initial calculation after value boxes are rendered
+        setTimeout(() => {
+            ensureFormulaFits();
+            this.calculateAndDrawAnnotations(formulaParts, this.originalBreakdown, svg, formulaContainer);
+        }, 50);
+        
+        // Add result display
+        const resultContainer = document.createElement('div');
+        resultContainer.style.cssText = `
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 2px solid #e9ecef;
+            text-align: center;
+        `;
+        
+        const resultLabel = document.createElement('div');
+        resultLabel.style.cssText = `
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 8px;
+            font-weight: 500;
+        `;
+        resultLabel.textContent = 'Result';
+        resultContainer.appendChild(resultLabel);
+        
+        const resultValue = document.createElement('div');
+        resultValue.style.cssText = `
+            font-size: 28px;
+            font-weight: bold;
+            color: #2c3e50;
+            font-family: 'Courier New', monospace;
+        `;
+        resultValue.textContent = this.originalBreakdown.result;
+        resultContainer.appendChild(resultValue);
+        
+        this.formulaSection.appendChild(resultContainer);
+        
+        // Add note if available
+        if (this.originalBreakdown.note) {
+            const noteContainer = document.createElement('div');
+            noteContainer.style.cssText = `
+                margin-top: 16px;
+                padding: 12px;
+                background: #fff3cd;
+                border: 1px solid #ffc107;
+                border-radius: 4px;
+                font-size: 13px;
+                color: #856404;
+                font-style: italic;
+            `;
+            noteContainer.textContent = this.originalBreakdown.note;
+            this.formulaSection.appendChild(noteContainer);
+        }
     }
 
     calculateBreakdown(columnName, data, inputValues, yearData = null) {
@@ -959,7 +1190,8 @@ export class FormulaModal {
             'rental_income': 'rental_income',
             'taxable_income': 'taxable_income',
             'taxes_due': 'taxes_due',
-            'net_profit': 'net_profit',
+            'rental_gains': 'rental_gains',
+            'cumulative_rental_gains': 'cumulative_rental_gains',
             'cumulative_investment': 'cumulative_investment',
             'expected_return': 'expected_return',
             'cumulative_expected_return': 'cumulative_expected_return',
@@ -1321,16 +1553,46 @@ export class FormulaModal {
             }
 
             case 'net_return': {
+                // New calculation: Net Return = (Sale Net - Downpayment) + max(0, Cumulative Rental Gains)
                 const saleNet = data.sale_net || 0;
-                const cumulativeInvestment = data.cumulative_investment || 0;
-                breakdown.expression = [
-                    { type: 'value', value: formatCurrency(saleNet), label: 'Sale Net', source: 'Sale Net column' },
-                    { type: 'operator', value: '−' },
-                    { type: 'value', value: formatCurrency(cumulativeInvestment), label: 'Cumulative Investment', source: 'Cumulative Investment column' },
-                    { type: 'equals', value: '=' },
-                    { type: 'text', value: formatCurrency(data.net_return) }
-                ];
-                breakdown.result = formatCurrency(data.net_return);
+                const purchasePrice = inputValues.get('purchase_price') || 0;
+                const downpaymentPercent = (inputValues.get('downpayment_percentage') || 0) / 100;
+                const downpayment = purchasePrice * downpaymentPercent;
+                
+                // Use cumulative rental gains directly from the data
+                const cumulativeNetProfit = data.cumulative_rental_gains || 0;
+                const profitFromSale = saleNet - downpayment;
+                const profitsReceived = Math.max(0, cumulativeNetProfit);
+                const netReturn = data.net_return || 0;
+                
+                if (cumulativeNetProfit > 0) {
+                    // Show full breakdown with positive cumulative rental gains
+                    breakdown.expression = [
+                        { type: 'text', value: '(' },
+                        { type: 'value', value: formatCurrency(saleNet), label: 'Sale Net', source: 'Sale Net column' },
+                        { type: 'operator', value: '−' },
+                        { type: 'value', value: formatCurrency(downpayment), label: 'Downpayment', source: 'Initial Investment' },
+                        { type: 'text', value: ')' },
+                        { type: 'operator', value: '+' },
+                        { type: 'value', value: formatCurrency(profitsReceived), label: 'Cumulative Rental Gains', source: `Cumulative Rental Gains column: ${formatCurrency(cumulativeNetProfit)} (positive = gains received)` },
+                        { type: 'equals', value: '=' },
+                        { type: 'text', value: formatCurrency(netReturn) }
+                    ];
+                } else {
+                    // Show breakdown without adding gains (cumulative rental gains is negative or zero)
+                    breakdown.expression = [
+                        { type: 'text', value: '(' },
+                        { type: 'value', value: formatCurrency(saleNet), label: 'Sale Net', source: 'Sale Net column' },
+                        { type: 'operator', value: '−' },
+                        { type: 'value', value: formatCurrency(downpayment), label: 'Downpayment', source: 'Initial Investment' },
+                        { type: 'text', value: ')' },
+                        { type: 'operator', value: '+' },
+                        { type: 'value', value: formatCurrency(0), label: 'Cumulative Rental Gains (if positive)', source: `Cumulative Rental Gains column: ${formatCurrency(cumulativeNetProfit)} (negative or zero, so 0 added)` },
+                        { type: 'equals', value: '=' },
+                        { type: 'text', value: formatCurrency(netReturn) }
+                    ];
+                }
+                breakdown.result = formatCurrency(netReturn);
                 break;
             }
 
@@ -1687,9 +1949,9 @@ export class FormulaModal {
                     deductibleExpenses = yearData.reduce((sum, month) => sum + (month.deductible_expenses || 0), 0);
                     taxableIncome = data.taxable_income || 0; // Already summed by YearGroupRow
                     breakdown.expression = [
-                        { type: 'value', value: formatCurrency(rentalIncome), label: 'Rental Income', source: `Sum of ${yearData.length} months` },
+                        { type: 'value', value: formatCurrency(rentalIncome), label: 'Rental Income', source: `Rental Income column (sum of ${yearData.length} months)` },
                         { type: 'operator', value: '−' },
-                        { type: 'value', value: formatCurrency(deductibleExpenses), label: 'Deductible Expenses', source: `Sum of ${yearData.length} months` },
+                        { type: 'value', value: formatCurrency(deductibleExpenses), label: 'Deductible Expenses', source: `Deductible Expenses column (sum of ${yearData.length} months)` },
                         { type: 'equals', value: '=' },
                         { type: 'text', value: formatCurrency(taxableIncome) }
                     ];
@@ -1719,7 +1981,7 @@ export class FormulaModal {
                     taxableIncome = yearData.reduce((sum, month) => sum + (month.taxable_income || 0), 0);
                     taxesDue = data.taxes_due || 0; // Already summed by YearGroupRow
                     breakdown.expression = [
-                        { type: 'value', value: formatCurrency(taxableIncome), label: 'Taxable Income', source: `Sum of ${yearData.length} months` },
+                        { type: 'value', value: formatCurrency(taxableIncome), label: 'Taxable Income', source: `Taxable Income column (sum of ${yearData.length} months)` },
                         { type: 'operator', value: '×' },
                         { type: 'value', value: formatPercent(taxRate), label: 'Marginal Tax Rate', source: 'Input: Marginal Tax Rate' },
                         { type: 'equals', value: '=' },
@@ -1741,7 +2003,7 @@ export class FormulaModal {
                 break;
             }
 
-            case 'net_profit': {
+            case 'rental_gains': {
                 let rentalIncome, totalExpenses, taxesDue, netProfit;
                 
                 if (yearData && yearData.length > 0) {
@@ -1749,13 +2011,13 @@ export class FormulaModal {
                     rentalIncome = yearData.reduce((sum, month) => sum + (month.rental_income || 0), 0);
                     totalExpenses = yearData.reduce((sum, month) => sum + (month.total_expenses || 0), 0);
                     taxesDue = yearData.reduce((sum, month) => sum + (month.taxes_due || 0), 0);
-                    netProfit = data.net_profit || 0; // Already summed by YearGroupRow
+                    netProfit = data.rental_gains || 0; // Already summed by YearGroupRow
                     breakdown.expression = [
-                        { type: 'value', value: formatCurrency(rentalIncome), label: 'Rental Income', source: `Sum of ${yearData.length} months` },
+                        { type: 'value', value: formatCurrency(rentalIncome), label: 'Rental Income', source: `Rental Income column (sum of ${yearData.length} months)` },
                         { type: 'operator', value: '−' },
-                        { type: 'value', value: formatCurrency(totalExpenses), label: 'Total Expenses', source: `Sum of ${yearData.length} months` },
+                        { type: 'value', value: formatCurrency(totalExpenses), label: 'Total Expenses', source: `Total Expenses column (sum of ${yearData.length} months)` },
                         { type: 'operator', value: '−' },
-                        { type: 'value', value: formatCurrency(taxesDue), label: 'Taxes Due', source: `Sum of ${yearData.length} months` },
+                        { type: 'value', value: formatCurrency(taxesDue), label: 'Taxes Due', source: `Taxes Due column (sum of ${yearData.length} months)` },
                         { type: 'equals', value: '=' },
                         { type: 'text', value: formatCurrency(netProfit) }
                     ];
@@ -1764,7 +2026,7 @@ export class FormulaModal {
                     rentalIncome = data.rental_income || 0;
                     totalExpenses = data.total_expenses || 0;
                     taxesDue = data.taxes_due || 0;
-                    netProfit = data.net_profit || 0;
+                    netProfit = data.rental_gains || 0;
                     breakdown.expression = [
                         { type: 'value', value: formatCurrency(rentalIncome), label: 'Rental Income', source: 'Rental Income column' },
                         { type: 'operator', value: '−' },
@@ -1779,74 +2041,92 @@ export class FormulaModal {
                 break;
             }
 
+            case 'cumulative_rental_gains': {
+                // Cumulative Rental Gains = Previous Cumulative Rental Gains + Current Month Rental Gains
+                const currentCumulativeNetProfit = data.cumulative_rental_gains !== undefined ? data.cumulative_rental_gains : 0;
+                const currentNetProfit = data.rental_gains !== undefined ? data.rental_gains : 0;
+                
+                if (yearData && yearData.length > 0) {
+                    // Summary row: show the same formula as the last month of that year
+                    const lastMonth = yearData[yearData.length - 1];
+                    const lastMonthCumulativeNetProfit = lastMonth.cumulative_rental_gains !== undefined ? lastMonth.cumulative_rental_gains : 0;
+                    const lastMonthNetProfit = lastMonth.rental_gains !== undefined ? lastMonth.rental_gains : 0;
+                    const previousCumulativeNetProfit = lastMonthCumulativeNetProfit - lastMonthNetProfit;
+                    
+                    breakdown.expression = [
+                        { type: 'value', value: formatCurrency(previousCumulativeNetProfit), label: 'Previous Cumulative Rental Gains', source: `Cumulative Rental Gains column (Month ${(lastMonth.month || 0) - 1})` },
+                        { type: 'operator', value: '+' },
+                        { type: 'value', value: formatCurrency(lastMonthNetProfit), label: 'Current Rental Gains', source: `Rental Gains column (Month ${lastMonth.month || 0})` },
+                        { type: 'equals', value: '=' },
+                        { type: 'text', value: formatCurrency(lastMonthCumulativeNetProfit) }
+                    ];
+                    // Use the last month's cumulative for the result in summary rows
+                    breakdown.result = formatCurrency(lastMonthCumulativeNetProfit);
+                } else {
+                    // Regular row
+                    if (data.month === 0) {
+                        // Month 0: starts at 0
+                        breakdown.expression = [
+                            { type: 'value', value: formatCurrency(0), label: 'Starting Value', source: 'Month 0 (Initial State)' }
+                        ];
+                    } else {
+                        // Subsequent months: previous cumulative + current rental gains
+                        const previousCumulativeNetProfit = currentCumulativeNetProfit - currentNetProfit;
+                        breakdown.expression = [
+                            { type: 'value', value: formatCurrency(previousCumulativeNetProfit), label: 'Previous Cumulative Rental Gains', source: `Cumulative Rental Gains column (Month ${(data.month || 0) - 1})` },
+                            { type: 'operator', value: '+' },
+                            { type: 'value', value: formatCurrency(currentNetProfit), label: 'Current Rental Gains', source: `Rental Gains column (Month ${data.month || 0})` },
+                            { type: 'equals', value: '=' },
+                            { type: 'text', value: formatCurrency(currentCumulativeNetProfit) }
+                        ];
+                    }
+                    breakdown.result = formatCurrency(currentCumulativeNetProfit);
+                }
+                
+                break;
+            }
+
             case 'cumulative_investment': {
-                // Cumulative Investment = Previous Cumulative Investment - Net Profit
-                // Starts with downpayment, then subtracts net profit each month
-                // (Positive net profit reduces investment, negative net profit increases it)
+                // New calculation: Cumulative Investment = Downpayment + max(0, -Cumulative Rental Gains)
+                // If cumulative rental gains is negative (losses), add to investment
+                // If cumulative rental gains is positive, investment stays at downpayment
                 const purchasePrice = inputValues.get('purchase_price') || 0;
                 const downpaymentPercent = (inputValues.get('downpayment_percentage') || 0) / 100;
                 const downpayment = purchasePrice * downpaymentPercent;
-                const netProfit = data.net_profit || 0;
                 const currentCumulative = data.cumulative_investment || 0;
                 
-                let previousCumulative;
-                let sourceLabel;
+                // Use cumulative rental gains directly from the data
+                const cumulativeNetProfit = data.cumulative_rental_gains || 0;
+                const losses = Math.max(0, -cumulativeNetProfit);
                 
-                if (yearData && yearData.length > 0) {
-                    // Summary row: calculate starting cumulative investment
-                    const firstMonth = yearData[0];
-                    const firstMonthNumber = firstMonth.month || 0;
-                    
-                    if (firstMonthNumber === 1) {
-                        // Year 1: starting cumulative is month 0's cumulative investment (downpayment)
-                        // Month 0's cumulative investment is just the downpayment
-                        previousCumulative = downpayment;
-                        sourceLabel = 'Month 0 (Downpayment)';
-                    } else {
-                        // Other years: starting cumulative is previous year's last month cumulative investment
-                        // First month's cumulative already includes first month's net profit, so reverse it
-                        previousCumulative = (firstMonth.cumulative_investment || 0) + (firstMonth.net_profit || 0);
-                        sourceLabel = `End of Year ${(data.year || firstMonth.year) - 1} (Previous Year's Last Month)`;
-                    }
-                    
-                    // Sum all net profits during the year for the summary
-                    const totalNetProfit = yearData.reduce((sum, month) => sum + (month.net_profit || 0), 0);
-                    
+                if (data.month === 0) {
+                    // Month 0: just downpayment
                     breakdown.expression = [
-                        { type: 'value', value: formatCurrency(previousCumulative), label: 'Starting Cumulative Investment', source: sourceLabel },
-                        { type: 'operator', value: '−' },
-                        { type: 'value', value: formatCurrency(totalNetProfit), label: 'Total Net Profit This Year', source: `Sum of ${yearData.length} months (positive = profit, negative = loss)` },
+                        { type: 'value', value: formatCurrency(downpayment), label: 'Downpayment', source: `Purchase Price (${formatCurrency(purchasePrice)}) × Downpayment % (${formatPercent(downpaymentPercent)})` }
+                    ];
+                } else if (yearData && yearData.length > 0 && losses > 0) {
+                    // Summary row with losses
+                    breakdown.expression = [
+                        { type: 'value', value: formatCurrency(downpayment), label: 'Downpayment', source: 'Initial Investment' },
+                        { type: 'operator', value: '+' },
+                        { type: 'value', value: formatCurrency(losses), label: 'Cumulative Losses', source: `Cumulative Rental Gains column: ${formatCurrency(cumulativeNetProfit)} (negative = losses)` },
+                        { type: 'equals', value: '=' },
+                        { type: 'text', value: formatCurrency(currentCumulative) }
+                    ];
+                } else if (losses > 0) {
+                    // Single row with losses
+                    breakdown.expression = [
+                        { type: 'value', value: formatCurrency(downpayment), label: 'Downpayment', source: 'Initial Investment' },
+                        { type: 'operator', value: '+' },
+                        { type: 'value', value: formatCurrency(losses), label: 'Cumulative Losses', source: `Cumulative Rental Gains column: ${formatCurrency(cumulativeNetProfit)} (negative = losses)` },
                         { type: 'equals', value: '=' },
                         { type: 'text', value: formatCurrency(currentCumulative) }
                     ];
                 } else {
-                    // Regular row
-                    if (data.month === 0) {
-                        // Month 0: just downpayment
-                        breakdown.expression = [
-                            { type: 'value', value: formatCurrency(downpayment), label: 'Downpayment', source: `Purchase Price (${formatCurrency(purchasePrice)}) × Downpayment % (${formatPercent(downpaymentPercent)})` }
-                        ];
-                    } else if (data.month === 1) {
-                        // Month 1: downpayment - first month's net profit
-                        previousCumulative = downpayment;
-                        breakdown.expression = [
-                            { type: 'value', value: formatCurrency(previousCumulative), label: 'Downpayment', source: 'Initial Investment' },
-                            { type: 'operator', value: '−' },
-                            { type: 'value', value: formatCurrency(netProfit), label: 'Net Profit This Month', source: 'Month 1 Net Profit' },
-                            { type: 'equals', value: '=' },
-                            { type: 'text', value: formatCurrency(currentCumulative) }
-                        ];
-                    } else {
-                        // Subsequent months: previous cumulative - net profit
-                        previousCumulative = currentCumulative + netProfit;
-                        breakdown.expression = [
-                            { type: 'value', value: formatCurrency(previousCumulative), label: 'Previous Cumulative Investment', source: `Month ${(data.month || 0) - 1}` },
-                            { type: 'operator', value: '−' },
-                            { type: 'value', value: formatCurrency(netProfit), label: 'Net Profit This Month', source: `Month ${data.month || 0}` },
-                            { type: 'equals', value: '=' },
-                            { type: 'text', value: formatCurrency(currentCumulative) }
-                        ];
-                    }
+                    // No losses, investment equals downpayment
+                    breakdown.expression = [
+                        { type: 'value', value: formatCurrency(downpayment), label: 'Downpayment', source: 'Initial Investment (no losses to add)' }
+                    ];
                 }
                 
                 breakdown.result = formatCurrency(currentCumulative);
@@ -1936,7 +2216,7 @@ export class FormulaModal {
                     const lastMonth = yearData[yearData.length - 1];
                     const lastMonthCumulativeInvestment = lastMonth.cumulative_investment || 0;
                     const lastMonthCumulativeExpectedReturn = lastMonth.cumulative_expected_return || 0;
-                    const lastMonthNetProfit = lastMonth.net_profit || 0;
+                    const lastMonthNetProfit = lastMonth.rental_gains || 0;
                     
                     // Calculate previous cumulative expected return for the last month
                     let lastMonthPreviousCumulativeExpectedReturn;
@@ -1967,7 +2247,7 @@ export class FormulaModal {
                 } else {
                     // Regular row: calculate using current cumulative investment and previous cumulative expected return
                     const currentCumulativeExpectedReturn = data.cumulative_expected_return || 0;
-                    const netProfit = data.net_profit || 0;
+                    const netProfit = data.rental_gains || 0;
                     
                     // Calculate previous cumulative expected return by reversing the formula:
                     // current = (previous - net_profit) * (1 + rate)
@@ -2017,9 +2297,9 @@ export class FormulaModal {
                     const currentYearExpectedReturn = yearData.reduce((sum, month) => sum + (month.expected_return || 0), 0); // Sum of expected return for the year
                     
                     breakdown.expression = [
-                        { type: 'value', value: formatCurrency(previousYearCumulative), label: 'Previous Year Summary Cumulative Expected Return', source: `Year ${currentYear - 1} Summary - Cumulative Expected Return` },
+                        { type: 'value', value: formatCurrency(previousYearCumulative), label: 'Previous Year Summary Cumulative Expected Return', source: `Cumulative Expected Return column (Year ${currentYear - 1} Summary)` },
                         { type: 'operator', value: '+' },
-                        { type: 'value', value: formatCurrency(currentYearExpectedReturn), label: 'Current Year Summary Expected Return', source: `Year ${currentYear} Summary - Expected Return (sum of ${yearData.length} months)` },
+                        { type: 'value', value: formatCurrency(currentYearExpectedReturn), label: 'Current Year Summary Expected Return', source: `Expected Return column (Year ${currentYear} Summary, sum of ${yearData.length} months)` },
                         { type: 'equals', value: '=' },
                         { type: 'text', value: formatCurrency(currentCumulative) }
                     ];
@@ -2082,11 +2362,11 @@ export class FormulaModal {
                 
                 breakdown.expression = [
                     { type: 'text', value: '(' },
-                    { type: 'value', value: formatCurrency(salePrice), label: 'Sale Price', source: 'Home Value' },
+                    { type: 'value', value: formatCurrency(salePrice), label: 'Sale Price', source: 'Home Value column' },
                     { type: 'operator', value: '−' },
                     { type: 'value', value: formatCurrency(purchasePrice), label: 'Purchase Price', source: 'Input' },
                     { type: 'operator', value: '−' },
-                    { type: 'value', value: formatCurrency(sellingCosts), label: 'Selling Costs', source: 'Sales Fees' },
+                    { type: 'value', value: formatCurrency(sellingCosts), label: 'Selling Costs', source: 'Sales Fees column' },
                     { type: 'text', value: ') × 0.5 × ' },
                     { type: 'value', value: formatPercent(marginalRate), label: 'Marginal Tax Rate', source: 'Input' },
                     { type: 'equals', value: '=' },
@@ -2116,13 +2396,15 @@ export class FormulaModal {
             }
 
             case 'return_percent': {
+                // Return % = Net Return ÷ Cumulative Investment × 100
+                // Where Net Return and Cumulative Investment are calculated using the new method
                 const netReturn = data.net_return || 0;
                 const cumulativeInvestment = data.cumulative_investment || 0;
                 const returnPercent = cumulativeInvestment > 0 ? (netReturn / cumulativeInvestment) * 100 : 0;
                 breakdown.expression = [
-                    { type: 'value', value: formatCurrency(netReturn), label: 'Net Return', source: 'Net Return column' },
+                    { type: 'value', value: formatCurrency(netReturn), label: 'Net Return', source: 'Net Return column (calculated using new method)' },
                     { type: 'operator', value: '÷' },
-                    { type: 'value', value: formatCurrency(cumulativeInvestment), label: 'Cumulative Investment', source: 'Cumulative Investment column' },
+                    { type: 'value', value: formatCurrency(cumulativeInvestment), label: 'Cumulative Investment', source: 'Cumulative Investment column (calculated using new method)' },
                     { type: 'operator', value: '×' },
                     { type: 'value', value: '100', label: '100', source: 'Convert to %' },
                     { type: 'equals', value: '=' },

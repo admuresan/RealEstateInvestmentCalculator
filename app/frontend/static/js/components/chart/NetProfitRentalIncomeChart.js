@@ -1,5 +1,5 @@
 /**
- * Chart component for displaying net profit and rental income comparison over time.
+ * Chart component for displaying rental gains and rental income comparison over time.
  */
 export class NetProfitRentalIncomeChart {
     constructor(parent) {
@@ -13,7 +13,7 @@ export class NetProfitRentalIncomeChart {
         this.container = document.createElement('div');
         this.container.className = 'chart-container';
         const chartTitle = document.createElement('h2');
-        chartTitle.textContent = 'Net Profit vs Rental Income';
+        chartTitle.textContent = 'Rental Gains vs Rental Income';
         chartTitle.className = 'chart-title';
         this.container.appendChild(chartTitle);
         const canvasContainer = document.createElement('div');
@@ -75,7 +75,7 @@ export class NetProfitRentalIncomeChart {
                 labels: this.chartData.labels,
                 datasets: [
                     {
-                        label: 'Net Profit',
+                        label: 'Rental Gains',
                         data: this.chartData.netProfit,
                         borderColor: 'rgb(40, 167, 69)',
                         backgroundColor: 'rgba(40, 167, 69, 0.1)',
@@ -192,8 +192,8 @@ export class NetProfitRentalIncomeChart {
             // Create label - use year number
             const label = `Year ${result.year || Math.floor(result.month / 12) + 1}`;
             this.chartData.labels.push(label);
-            // Net Profit
-            this.chartData.netProfit.push(result.net_profit);
+            // Rental Gains
+            this.chartData.netProfit.push(result.rental_gains);
             // Rental Income
             this.chartData.rentalIncome.push(result.rental_income);
             // Total Expenses

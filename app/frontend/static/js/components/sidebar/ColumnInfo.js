@@ -87,10 +87,16 @@ export const COLUMN_DEFINITIONS = [
         aggregationNote: 'Summary shows the sum across all months in the year.'
     },
     {
-        name: 'Net Profit',
+        name: 'Rental Gains',
         description: 'Profit after all expenses and taxes.',
         formula: 'Rental Income - Total Expenses - Taxes Due',
         aggregationNote: 'Summary shows the sum across all months in the year.'
+    },
+    {
+        name: 'Cumulative Rental Gains',
+        description: 'Sum of all rental gains from month 0 up to and including the current month. Positive values indicate cumulative gains received, negative values indicate cumulative losses.',
+        formula: 'Previous Cumulative Rental Gains + Current Month Rental Gains',
+        aggregationNote: 'Summary shows the final month value of the year.'
     },
     {
         name: 'Expected Return',
@@ -100,9 +106,9 @@ export const COLUMN_DEFINITIONS = [
     },
     {
         name: 'Cumulative Investment',
-        description: 'Total amount invested including downpayment and cumulative net profit.',
-        formula: 'Downpayment + Sum of All Net Profits Up To This Year',
-        aggregationNote: 'Summary shows the sum across all months in the year.'
+        description: 'Total cash invested: downpayment plus any cumulative losses. If cumulative rental gains is negative (losses), those losses are added to the investment. If cumulative rental gains is positive, investment equals the downpayment.',
+        formula: 'Downpayment + max(0, -Cumulative Rental Gains)',
+        aggregationNote: 'Summary shows the final month value of the year.'
     },
     {
         name: 'Cumulative Expected Return',
@@ -142,13 +148,13 @@ export const COLUMN_DEFINITIONS = [
     },
     {
         name: 'Net Return',
-        description: 'Sale net minus cumulative investment made into the property.',
-        formula: 'Sale Net - Cumulative Investment',
+        description: 'Total profit from the investment: profit from sale plus any profits already received. Calculated as (Sale Net - Downpayment) plus any positive cumulative rental gains.',
+        formula: '(Sale Net - Downpayment) + max(0, Cumulative Rental Gains)',
         aggregationNote: 'Summary shows the final month value of the year.'
     },
     {
         name: 'Return %',
-        description: 'Return percentage based on cumulative investment.',
+        description: 'Cash-on-cash return percentage: total profit divided by total cash invested. Uses the new calculation method where investment includes losses and return includes profits already received.',
         formula: '(Net Return / Cumulative Investment) × 100',
         aggregationNote: 'Summary shows the final month value of the year.'
     },

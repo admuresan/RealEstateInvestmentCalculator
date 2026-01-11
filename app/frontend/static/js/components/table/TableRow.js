@@ -48,7 +48,8 @@ export class TableRow {
             'rental_income': 'Rental Income',
             'taxable_income': 'Taxable Income',
             'taxes_due': 'Taxes Due',
-            'net_profit': 'Net Profit',
+            'rental_gains': 'Rental Gains',
+            'cumulative_rental_gains': 'Cumulative Rental Gains',
             'cumulative_investment': 'Cumulative Investment',
             'expected_return': 'Expected Return',
             'cumulative_expected_return': 'Cumulative Expected Return',
@@ -111,7 +112,8 @@ export class TableRow {
         this.cells.get('rental_income').textContent = this.formatCurrency(data.rental_income);
         this.cells.get('taxable_income').textContent = this.formatCurrency(data.taxable_income);
         this.cells.get('taxes_due').textContent = this.formatCurrency(data.taxes_due);
-        this.cells.get('net_profit').textContent = this.formatCurrency(data.net_profit);
+        this.cells.get('rental_gains').textContent = this.formatCurrency(data.rental_gains);
+        this.cells.get('cumulative_rental_gains').textContent = this.formatCurrency(data.cumulative_rental_gains || 0);
         this.cells.get('cumulative_investment').textContent = this.formatCurrency(data.cumulative_investment);
         this.cells.get('expected_return').textContent = this.formatCurrency(data.expected_return);
         this.cells.get('cumulative_expected_return').textContent = this.formatCurrency(data.cumulative_expected_return);

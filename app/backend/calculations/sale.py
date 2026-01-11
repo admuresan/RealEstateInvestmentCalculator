@@ -145,6 +145,32 @@ def calculate_net_return(sale_net: float, cumulative_investment: float) -> float
     return float(Decimal(str(sale_net)) - Decimal(str(cumulative_investment)))
 
 
+def calculate_net_return_new(sale_net: float, downpayment: float, cumulative_net_profit: float) -> float:
+    """
+    Calculate net return using new approach.
+    Return = (sale net - downpayment) + any profits already received.
+    This represents total profit from the investment.
+    
+    Args:
+        sale_net: Sale net amount (after paying off mortgage)
+        downpayment: Initial downpayment amount
+        cumulative_net_profit: Sum of all net profits up to this point
+    
+    Returns:
+        Net return (profit from sale + profits already received)
+    """
+    sn = Decimal(str(sale_net))
+    dp = Decimal(str(downpayment))
+    cnp = Decimal(str(cumulative_net_profit))
+    
+    # Profit from sale = sale_net - downpayment
+    # Add any profits already received (if cumulative net profit is positive)
+    profit_from_sale = sn - dp
+    profits_received = max(Decimal('0'), cnp)
+    
+    return float(profit_from_sale + profits_received)
+
+
 def calculate_return_percent(net_return: float, cumulative_investment: float) -> float:
     """
     Calculate return percentage based on cumulative investment.

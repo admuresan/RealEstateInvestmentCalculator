@@ -1,6 +1,9 @@
 /**
  * Investment summary component that displays key insights for investors.
  */
+import { FormulaModal } from './FormulaModal.js';
+import { COLUMN_DEFINITIONS } from './sidebar/ColumnInfo.js';
+
 export class InvestmentSummary {
     constructor(container, performanceContainer) {
         this.container = container;
@@ -8,6 +11,10 @@ export class InvestmentSummary {
             this.container.className = 'investment-summary';
         }
         this.performanceContainer = performanceContainer;
+        
+        // Initialize formula modal
+        this.formulaModal = new FormulaModal();
+        this.columnDefinitions = COLUMN_DEFINITIONS;
         
         // Create summary content structure
         this.createStructure();
@@ -72,19 +79,13 @@ export class InvestmentSummary {
         const downpaymentPercent = inputValues.get('downpayment_percentage') || 0;
         const downpayment = purchasePrice * (downpaymentPercent / 100);
         
-        // Calculate total investment: downpayment - sum of all net profits
-        let totalInvestment = downpayment;
-        results.forEach(result => {
-            totalInvestment -= (result.net_profit || 0);
-        });
-        
-        // Recalculate metrics using correct totalInvestment
-        // Backend calculates: net_return = sale_net - cumulative_investment
-        // We need to recalculate using actual totalInvestment (downpayment - sum of all net profits)
-        const saleNet = finalResult.sale_net || 0;
-        const netReturn = saleNet - totalInvestment;
+        // Use backend-calculated values (new calculation method)
+        // Cumulative Investment = Downpayment + max(0, -Cumulative Rental Gains)
+        // Net Return = (Sale Net - Downpayment) + max(0, Cumulative Rental Gains)
+        const totalInvestment = finalResult.cumulative_investment || downpayment;
+        const netReturn = finalResult.net_return || 0;
         const totalReturn = netReturn;
-        const returnPercent = totalInvestment > 0 ? (totalReturn / totalInvestment) * 100 : 0;
+        const returnPercent = finalResult.return_percent || 0;
         const returnComparison = finalResult.return_comparison || 0;
         const expectedReturnRate = inputValues.get('expected_return_rate') || 0;
         const cumulativeExpectedReturn = finalResult.cumulative_expected_return || 0;
@@ -95,10 +96,10 @@ export class InvestmentSummary {
         const expectedReturnNet = cumulativeExpectedReturn - totalInvestment;
         const expectedReturnPercent = totalInvestment > 0 ? ((expectedReturnNet / totalInvestment) * 100) : 0;
         
-        // Calculate net profit summary (sum of all net profits across all months)
+        // Calculate rental gains summary (sum of all rental gains across all months)
         let netProfitSummary = 0;
         results.forEach(result => {
-            netProfitSummary += (result.net_profit || 0);
+            netProfitSummary += (result.rental_gains || 0);
         });
         
         // Build Overall Performance HTML (for top container)
@@ -174,6 +175,8 @@ export class InvestmentSummary {
         // Update both containers
         if (this.performanceContent) {
             this.performanceContent.innerHTML = performanceHTML;
+            // Add formula modal click handlers to metric values
+            this.attachFormulaHandlers(this.performanceContent, results, inputValues);
         }
         if (this.contentContainer) {
             this.contentContainer.innerHTML = summaryHTML;
@@ -193,30 +196,16 @@ export class InvestmentSummary {
         
         if (!yearResult) return null;
         
-        const purchasePrice = inputValues.get('purchase_price') || 0;
-        const downpaymentPercent = inputValues.get('downpayment_percentage') || 0;
-        const downpayment = purchasePrice * (downpaymentPercent / 100);
-        
-        // Calculate total investment up to this year
-        // Total investment = downpayment - sum of all net profits up to this point
-        let totalInvestment = downpayment;
-        results.forEach(result => {
-            if (result.month <= targetMonth) {
-                totalInvestment -= (result.net_profit || 0);
-            }
-        });
-        
-        // Use net_return from backend which is already calculated as sale_net - cumulative_investment
-        // But we need to recalculate using our totalInvestment calculation for consistency
-        const saleNet = yearResult.sale_net || 0;
-        const netReturn = saleNet - totalInvestment;
+        // Use backend-calculated values (new calculation method)
+        const totalInvestment = yearResult.cumulative_investment || 0;
+        const netReturn = yearResult.net_return || 0;
         const totalReturn = netReturn;
-        const returnPercent = totalInvestment > 0 ? (totalReturn / totalInvestment) * 100 : 0;
+        const returnPercent = yearResult.return_percent || 0;
         const returnComparison = yearResult.return_comparison || 0;
         const cumulativeExpectedReturn = yearResult.cumulative_expected_return || 0;
         const homeValue = yearResult.home_value || purchasePrice;
         
-        // Calculate net profit summary for this year (sum of all 12 months in that year)
+        // Calculate rental gains summary for this year (sum of all 12 months in that year)
         // This is the summary row value - sum net_profit for months in this year
         // Year 5 = months 48-59 (12 months), Year 10 = months 108-119, etc.
         const yearStartMonth = (targetYear - 1) * 12; // Year 5 starts at month 48 (4*12)
@@ -225,7 +214,7 @@ export class InvestmentSummary {
         for (let month = yearStartMonth; month <= yearEndMonth && month < results.length; month++) {
             const monthResult = results.find(r => r.month === month);
             if (monthResult) {
-                netProfitSummary += (monthResult.net_profit || 0);
+                netProfitSummary += (monthResult.rental_gains || 0);
             }
         }
         
@@ -335,26 +324,19 @@ export class InvestmentSummary {
             
             const finalResult = results[results.length - 1];
             const purchasePrice = inputValues.get('purchase_price') || 0;
-            const downpaymentPercent = inputValues.get('downpayment_percentage') || 0;
-            const downpayment = purchasePrice * (downpaymentPercent / 100);
-            
-            let totalInvestment = downpayment;
-            results.forEach(result => {
-                totalInvestment -= (result.net_profit || 0);
-            });
-            
-            const saleNet = finalResult.sale_net || 0;
-            const netReturn = saleNet - totalInvestment;
+            // Use backend-calculated values (new calculation method)
+            const totalInvestment = finalResult.cumulative_investment || 0;
+            const netReturn = finalResult.net_return || 0;
             const totalReturn = netReturn;
-            const returnPercent = totalInvestment > 0 ? (totalReturn / totalInvestment) * 100 : 0;
+            const returnPercent = finalResult.return_percent || 0;
             const returnComparison = finalResult.return_comparison || 0;
             const cumulativeExpectedReturn = finalResult.cumulative_expected_return || 0;
             const homeValue = finalResult.home_value || purchasePrice;
             
-            // Calculate net profit summary (sum of all net profits across all months)
+            // Calculate rental gains summary (sum of all rental gains across all months)
             let netProfitSummary = 0;
             results.forEach(result => {
-                netProfitSummary += (result.net_profit || 0);
+                netProfitSummary += (result.rental_gains || 0);
             });
             
             return `
@@ -434,6 +416,25 @@ export class InvestmentSummary {
                 }
             });
         });
+        
+        // Add formula modal click handlers to metric values in each scenario row
+        scenariosData.forEach((scenario, index) => {
+            const { results, inputValues } = scenario;
+            const scenarioRow = this.performanceContent.querySelector(`[data-scenario-index="${index}"]`);
+            if (scenarioRow) {
+                // Handle collapsed mode (scenario-performance-row)
+                const collapsedRow = scenarioRow.querySelector('.scenario-performance-row');
+                if (collapsedRow) {
+                    this.attachFormulaHandlers(collapsedRow, results, inputValues);
+                }
+                
+                // Handle expanded mode (interval table)
+                const intervalTable = scenarioRow.querySelector('.interval-data-table');
+                if (intervalTable) {
+                    this.attachIntervalTableFormulaHandlers(intervalTable, results, inputValues);
+                }
+            }
+        });
     }
 
     generateInsights(finalResult, totalReturn, returnPercent, returnComparison, expectedReturnRate, cumulativeExpectedReturn, homeValue, purchasePrice, numYears, downpayment) {
@@ -456,7 +457,7 @@ export class InvestmentSummary {
         }
 
         // Cash flow insight
-        const avgNetProfit = finalResult.net_profit || 0;
+        const avgNetProfit = finalResult.rental_gains || 0;
         if (avgNetProfit > 0) {
             insights.push(`<li><strong>Positive Cash Flow:</strong> The property generates positive monthly cash flow, providing ongoing income throughout the investment period.</li>`);
         } else if (avgNetProfit < 0) {
@@ -489,6 +490,220 @@ export class InvestmentSummary {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
         }).format(value);
+    }
+
+    /**
+     * Map metric label to column name for formula display
+     */
+    getColumnNameForMetric(metricLabel) {
+        const metricToColumnMap = {
+            'Total Investment': 'Cumulative Investment',
+            'Home Sale Price': 'Home Value',
+            'Total Rental Gains': 'Cumulative Rental Gains',
+            'Return if Sold': 'Net Return',
+            'Return %': 'Return %',
+            'Expected Investment Return': 'Cumulative Expected Return',
+            'Comparison': 'Return Comparison'
+        };
+        return metricToColumnMap[metricLabel] || null;
+    }
+
+    /**
+     * Show formula modal for a metric
+     */
+    showFormulaForMetric(metricLabel, data, inputValues, results = null) {
+        const columnName = this.getColumnNameForMetric(metricLabel);
+        if (!columnName || !this.formulaModal) return;
+
+        const columnDef = this.columnDefinitions.find(def => def.name === columnName);
+        if (!columnDef) return;
+
+        // For "Total Rental Gains", we need to show Cumulative Rental Gains formula
+        // but note that it's the sum across all months
+        let formula = columnDef.formula;
+        let title = columnName;
+        
+        if (metricLabel === 'Total Rental Gains') {
+            const numMonths = results ? results.length : 0;
+            formula = columnDef.formula + ` (summed across ${numMonths} months)`;
+            title = `${columnName} (Total - Sum of All Months)`;
+        } else {
+            title = `${columnName} (Final Value)`;
+        }
+
+        this.formulaModal.show(
+            columnName,
+            formula,
+            data,
+            inputValues,
+            results // Pass all results as yearData for proper calculation
+        );
+
+        // Update title if needed
+        if (this.formulaModal.titleElement && metricLabel === 'Total Rental Gains') {
+            this.formulaModal.titleElement.textContent = title;
+        }
+    }
+
+    /**
+     * Attach formula modal handlers to metric values in a container
+     */
+    attachFormulaHandlers(container, results, inputValues) {
+        if (!container || !this.formulaModal) return;
+
+        const finalResult = results && results.length > 0 ? results[results.length - 1] : null;
+        if (!finalResult) return;
+
+        // Find all metric-value spans
+        const metricValues = container.querySelectorAll('.metric-value');
+        metricValues.forEach(metricValue => {
+            // Find the corresponding metric label
+            const metricContainer = metricValue.closest('.summary-metric');
+            if (!metricContainer) return;
+
+            const metricLabel = metricContainer.querySelector('.metric-label');
+            if (!metricLabel) return;
+
+            const labelText = metricLabel.textContent.replace(':', '').trim();
+            
+            // Add right-click handler
+            metricValue.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.showFormulaForMetric(labelText, finalResult, inputValues, results);
+            });
+
+            // Add cursor and title
+            metricValue.style.cursor = 'context-menu';
+            metricValue.title = 'Right-click to see formula';
+        });
+    }
+
+    /**
+     * Attach formula modal handlers to interval table cells
+     */
+    attachIntervalTableFormulaHandlers(table, results, inputValues) {
+        if (!table || !this.formulaModal) return;
+
+        const tbody = table.querySelector('tbody');
+        if (!tbody) return;
+
+        const rows = tbody.querySelectorAll('tr');
+        rows.forEach(row => {
+            const cells = row.querySelectorAll('td.metric-value');
+            cells.forEach((cell, index) => {
+                // Skip first cell (Year)
+                if (index === 0) return;
+
+                // Map column index to metric label
+                const columnLabels = [
+                    'Total Investment',
+                    'Home Sale Price',
+                    'Total Rental Gains',
+                    'Return if Sold',
+                    'Return %',
+                    'Expected Investment Return',
+                    'Comparison'
+                ];
+
+                const metricLabel = columnLabels[index - 1];
+                if (!metricLabel) return;
+
+                // Get the year from the first cell
+                const yearCell = row.querySelector('.interval-year');
+                if (!yearCell) return;
+
+                const yearMatch = yearCell.textContent.match(/Year (\d+)/);
+                if (!yearMatch) return;
+
+                const targetYear = parseInt(yearMatch[1], 10);
+                const yearMetrics = this.calculateMetricsForYear(results, inputValues, targetYear);
+                
+                if (!yearMetrics) return;
+
+                // Create a data object similar to finalResult for this year
+                const yearData = {
+                    cumulative_investment: yearMetrics.totalInvestment,
+                    home_value: yearMetrics.homeValue,
+                    cumulative_rental_gains: yearMetrics.netProfit, // This is the sum for the year
+                    net_return: yearMetrics.totalReturn,
+                    return_percent: yearMetrics.returnPercent,
+                    cumulative_expected_return: yearMetrics.cumulativeExpectedReturn,
+                    return_comparison: yearMetrics.returnComparison
+                };
+
+                // Add right-click handler
+                cell.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // For year intervals, we need to get the last month of that year
+                    const targetMonth = targetYear * 12 - 1;
+                    const yearResult = results.find(r => r.month === targetMonth) || 
+                                      results[Math.min(targetMonth, results.length - 1)];
+                    
+                    if (yearResult) {
+                        // For interval table, "Total Rental Gains" is the sum for that year only
+                        // So we need special handling
+                        if (metricLabel === 'Total Rental Gains') {
+                            // Show Rental Gains formula (not Cumulative) with year-specific note
+                            const columnDef = this.columnDefinitions.find(def => def.name === 'Rental Gains');
+                            if (columnDef) {
+                                const yearStartMonth = (targetYear - 1) * 12;
+                                const yearEndMonth = targetYear * 12 - 1;
+                                const yearResults = results.filter(r => 
+                                    r.month >= yearStartMonth && r.month <= yearEndMonth
+                                );
+                                
+                                // Use the last month of the year for data, but pass all year results
+                                this.formulaModal.show(
+                                    'Rental Gains',
+                                    columnDef.formula + ` (summed across 12 months for Year ${targetYear})`,
+                                    yearResult,
+                                    inputValues,
+                                    yearResults
+                                );
+                                
+                                // Update title
+                                if (this.formulaModal.titleElement) {
+                                    this.formulaModal.titleElement.textContent = `Rental Gains (Year ${targetYear} - Sum of 12 Months)`;
+                                }
+                            }
+                        } else {
+                            // For other metrics, use the standard method but with year-specific title
+                            const yearStartMonth = (targetYear - 1) * 12;
+                            const yearEndMonth = targetYear * 12 - 1;
+                            const yearResults = results.filter(r => 
+                                r.month >= yearStartMonth && r.month <= yearEndMonth
+                            );
+                            
+                            const columnName = this.getColumnNameForMetric(metricLabel);
+                            if (columnName) {
+                                const columnDef = this.columnDefinitions.find(def => def.name === columnName);
+                                if (columnDef) {
+                                    this.formulaModal.show(
+                                        columnName,
+                                        columnDef.formula + ` (Year ${targetYear} - Final Month Value)`,
+                                        yearResult,
+                                        inputValues,
+                                        yearResults
+                                    );
+                                    
+                                    // Update title to include year
+                                    if (this.formulaModal.titleElement) {
+                                        this.formulaModal.titleElement.textContent = `${columnName} (Year ${targetYear} - Final Month)`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // Add cursor and title
+                cell.style.cursor = 'context-menu';
+                cell.title = 'Right-click to see formula';
+            });
+        });
     }
 }
 

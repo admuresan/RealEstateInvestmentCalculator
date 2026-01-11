@@ -30,6 +30,7 @@ from app.backend.calculations.investment import (
     calculate_net_profit,
     calculate_expected_return,
     calculate_cumulative_investment,
+    calculate_cumulative_investment_new,
     calculate_cumulative_expected_return,
     calculate_cumulative_expected_return_monthly
 )
@@ -40,6 +41,7 @@ from app.backend.calculations.sale import (
     calculate_sale_income,
     calculate_sale_net,
     calculate_net_return,
+    calculate_net_return_new,
     calculate_return_percent,
     calculate_return_comparison
 )
@@ -181,7 +183,8 @@ def calculate_investment():
         # Initialize results
         results = []
         principal_remaining = loan_principal
-        cumulative_investment = downpayment  # Start with downpayment
+        cumulative_investment_old = downpayment  # Keep old calculation for expected return
+        cumulative_net_profit = 0.0  # Track cumulative net profit for new calculation
         cumulative_expected_return = 0.0  # Start at 0, will be sum of expected return values
         
         num_months = num_years * 12
@@ -194,8 +197,10 @@ def calculate_investment():
         )
         sale_income_0 = calculate_sale_income(home_value_0, sales_fees_0, capital_gains_tax_0)
         sale_net_0 = calculate_sale_net(sale_income_0, loan_principal)
-        net_return_0 = calculate_net_return(sale_net_0, downpayment)
-        return_percent_0 = calculate_return_percent(net_return_0, downpayment)
+        # Use new calculation methods for month 0 (cumulative_net_profit is 0)
+        cumulative_investment_0 = calculate_cumulative_investment_new(downpayment, 0.0)
+        net_return_0 = calculate_net_return_new(sale_net_0, downpayment, 0.0)
+        return_percent_0 = calculate_return_percent(net_return_0, cumulative_investment_0)
         return_comparison_0 = calculate_return_comparison(0.0, net_return_0)  # cumulative_expected_return is 0.0 for month 0
         
         result_row = {
@@ -215,8 +220,9 @@ def calculate_investment():
             'rental_income': 0.0,
             'taxable_income': 0.0,
             'taxes_due': 0.0,
-            'net_profit': 0.0,
-            'cumulative_investment': downpayment,
+            'rental_gains': 0.0,
+            'cumulative_rental_gains': 0.0,
+            'cumulative_investment': cumulative_investment_0,
             'expected_return': 0.0,
             'cumulative_expected_return': 0.0,
             'home_value': home_value_0,
@@ -262,16 +268,19 @@ def calculate_investment():
             taxes_due = calculate_taxes_due(taxable_income, marginal_tax_rate)
             net_profit = calculate_net_profit(rental_income, total_expenses, taxes_due)
             
-            # Calculate cumulative values first
+            # Track cumulative net profit for new calculation
+            cumulative_net_profit += net_profit
+            
+            # Calculate cumulative values for expected return (using old method)
             is_first_month = (month == 1)
-            cumulative_investment = calculate_cumulative_investment(
-                cumulative_investment, net_profit, downpayment, is_first_month
+            cumulative_investment_old = calculate_cumulative_investment(
+                cumulative_investment_old, net_profit, downpayment, is_first_month
             )
             
             # Expected return is calculated monthly based on (cumulative investment + previous cumulative expected return) × return rate
             monthly_return_rate = expected_return_rate / 12
             expected_return = calculate_expected_return(
-                cumulative_investment, cumulative_expected_return, monthly_return_rate
+                cumulative_investment_old, cumulative_expected_return, monthly_return_rate
             )
             
             # Cumulative expected return is the sum of expected return values up to and including this month
@@ -287,7 +296,10 @@ def calculate_investment():
             )
             sale_income = calculate_sale_income(home_value, sales_fees, capital_gains_tax)
             sale_net = calculate_sale_net(sale_income, principal_remaining)
-            net_return = calculate_net_return(sale_net, cumulative_investment)
+            
+            # Use new calculation methods
+            cumulative_investment = calculate_cumulative_investment_new(downpayment, cumulative_net_profit)
+            net_return = calculate_net_return_new(sale_net, downpayment, cumulative_net_profit)
             return_percent = calculate_return_percent(net_return, cumulative_investment)
             return_comparison = calculate_return_comparison(cumulative_expected_return, net_return)
             
@@ -310,9 +322,10 @@ def calculate_investment():
                 'deductible_expenses': deductible_expenses,
                 'rental_income': rental_income,
                 'taxable_income': taxable_income,
-                'taxes_due': taxes_due,
-                'net_profit': net_profit,
-                'cumulative_investment': cumulative_investment,
+            'taxes_due': taxes_due,
+            'rental_gains': net_profit,
+            'cumulative_rental_gains': cumulative_net_profit,
+            'cumulative_investment': cumulative_investment,
                 'expected_return': expected_return,
                 'cumulative_expected_return': cumulative_expected_return,
                 'home_value': home_value,
