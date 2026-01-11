@@ -19,6 +19,36 @@ export class FormulaModal {
             { bg: '#ffeaa7', border: '#fdcb6e', text: '#856404' }, // Light Yellow
             { bg: '#dfe6e9', border: '#636e72', text: '#2d3436' }, // Dark Gray
         ];
+        // Expansion state tracking
+        this.currentColumnName = null;
+        this.currentData = null;
+        this.currentInputValues = null;
+        this.currentYearData = null;
+        this.expansionHistory = []; // Stack of previous formula states
+        this.currentFormulaContainer = null;
+        this.currentFormulaContent = null;
+        this.currentSvg = null;
+        this.currentBreakdown = null;
+        // Mapping from labels to column keys for expansion
+        this.labelToColumnKey = {
+            'Sale Income': 'sale_income',
+            'Sale Net': 'sale_net',
+            'Home Value': 'home_value',
+            'Sales Fees': 'sales_fees',
+            'Capital Gains Tax': 'capital_gains_tax',
+            'Principal Remaining': 'principal_remaining',
+            'Net Return': 'net_return',
+            'Cumulative Investment': 'cumulative_investment',
+            'Total Expenses': 'total_expenses',
+            'Deductible Expenses': 'deductible_expenses',
+            'Taxable Income': 'taxable_income',
+            'Taxes Due': 'taxes_due',
+            'Net Profit': 'net_profit',
+            'Rental Income': 'rental_income',
+            'Mortgage Payments': 'mortgage_payments',
+            'Principal Paid': 'principal_paid',
+            'Interest Paid': 'interest_paid'
+        };
         this.createModal();
     }
     
@@ -97,15 +127,47 @@ export class FormulaModal {
         closeButton.addEventListener('click', () => this.hide());
         this.modal.appendChild(closeButton);
 
+        // Title container with back button
+        const titleContainer = document.createElement('div');
+        titleContainer.style.cssText = `
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        `;
+        
+        // Back button (initially hidden)
+        this.backButton = document.createElement('button');
+        this.backButton.textContent = '← Back';
+        this.backButton.style.cssText = `
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            display: none;
+        `;
+        this.backButton.addEventListener('mouseenter', () => {
+            this.backButton.style.backgroundColor = '#5a6268';
+        });
+        this.backButton.addEventListener('mouseleave', () => {
+            this.backButton.style.backgroundColor = '#6c757d';
+        });
+        this.backButton.addEventListener('click', () => this.goBack());
+        titleContainer.appendChild(this.backButton);
+        
         // Title
         this.titleElement = document.createElement('h3');
         this.titleElement.style.cssText = `
-            margin: 0 0 20px 0;
+            margin: 0;
             font-size: 22px;
             color: #333;
             font-weight: 600;
         `;
-        this.modal.appendChild(this.titleElement);
+        titleContainer.appendChild(this.titleElement);
+        this.modal.appendChild(titleContainer);
 
         // Formula display section with annotations
         this.formulaSection = document.createElement('div');
@@ -133,7 +195,21 @@ export class FormulaModal {
         });
     }
 
-    show(columnName, formula, data, inputValues, yearData = null) {
+    show(columnName, formula, data, inputValues, yearData = null, isExpansion = false) {
+        // If this is not an expansion, reset history
+        if (!isExpansion) {
+            this.expansionHistory = [];
+            this.backButton.style.display = 'none';
+        } else {
+            this.backButton.style.display = 'block';
+        }
+        
+        // Store current state
+        this.currentColumnName = columnName;
+        this.currentData = data;
+        this.currentInputValues = inputValues;
+        this.currentYearData = yearData;
+        
         this.titleElement.textContent = columnName;
         
         // Reset color mapping for new formula
@@ -141,6 +217,7 @@ export class FormulaModal {
         
         // Get formula breakdown
         const breakdown = this.calculateBreakdown(columnName, data, inputValues, yearData);
+        this.currentBreakdown = breakdown;
         
         // Clear and rebuild formula section
         this.formulaSection.innerHTML = '';
@@ -159,6 +236,7 @@ export class FormulaModal {
             justify-content: center;
             overflow: visible;
         `;
+        this.currentFormulaContainer = formulaContainer;
         
         // Create SVG for drawing annotation lines
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -173,6 +251,7 @@ export class FormulaModal {
             overflow: visible;
         `;
         formulaContainer.appendChild(svg);
+        this.currentSvg = svg;
         
         // Create formula content container - Step 1: Center formula on one line
         const formulaContent = document.createElement('div');
@@ -187,9 +266,10 @@ export class FormulaModal {
             text-align: center;
             width: 100%;
         `;
+        this.currentFormulaContent = formulaContent;
         
         // Build formula with annotated values
-        const formulaParts = this.buildAnnotatedFormula(breakdown, formulaContent, svg, formulaContainer);
+        const formulaParts = this.buildAnnotatedFormula(breakdown, formulaContent, svg, formulaContainer, data, inputValues, yearData);
         
         formulaContainer.appendChild(formulaContent);
         this.formulaSection.appendChild(formulaContainer);
@@ -270,7 +350,7 @@ export class FormulaModal {
         this.overlay.style.display = 'flex';
     }
 
-    buildAnnotatedFormula(breakdown, container, svg, parentContainer) {
+    buildAnnotatedFormula(breakdown, container, svg, parentContainer, data = null, inputValues = null, yearData = null) {
         const parts = [];
         const formatCurrency = (value) => {
             if (value === null || value === undefined || isNaN(value)) {
@@ -306,6 +386,16 @@ export class FormulaModal {
                     // Get color for this label (same label = same color)
                     const colorScheme = this.getColorForLabel(part.label);
                     
+                    // Check if this value can be expanded
+                    // A value is expandable if:
+                    // 1. It has a corresponding column key in our mapping
+                    // 2. The data object has that property (meaning it's a computed column value)
+                    // 3. The source indicates it's from a column (not an input)
+                    const columnKey = this.labelToColumnKey[part.label];
+                    const hasColumnKey = columnKey && data && data.hasOwnProperty(columnKey);
+                    const isFromColumn = part.source && (part.source.includes('column') || part.source.includes('Column'));
+                    const canExpand = hasColumnKey && isFromColumn;
+                    
                     const valueSpan = document.createElement('span');
                     valueSpan.className = `formula-value-${index}`;
                     valueSpan.textContent = part.value;
@@ -317,7 +407,7 @@ export class FormulaModal {
                         font-family: 'Courier New', monospace;
                         font-weight: 600;
                         color: ${colorScheme.text};
-                        cursor: help;
+                        cursor: ${canExpand ? 'pointer' : 'help'};
                         position: relative;
                         display: inline-block;
                         text-align: center;
@@ -333,7 +423,7 @@ export class FormulaModal {
                     // Add annotation tooltip
                     const tooltip = document.createElement('div');
                     tooltip.className = `formula-tooltip-${index}`;
-                    tooltip.textContent = part.label;
+                    tooltip.textContent = part.label + (canExpand ? ' (Right-click to expand)' : '');
                     tooltip.style.cssText = `
                         position: absolute;
                         bottom: 100%;
@@ -371,10 +461,26 @@ export class FormulaModal {
                     
                     valueSpan.addEventListener('mouseenter', () => {
                         tooltip.style.opacity = '1';
+                        if (canExpand) {
+                            valueSpan.style.borderColor = '#007bff';
+                            valueSpan.style.boxShadow = '0 0 0 2px rgba(0, 123, 255, 0.25)';
+                        }
                     });
                     valueSpan.addEventListener('mouseleave', () => {
                         tooltip.style.opacity = '0';
+                        if (canExpand) {
+                            valueSpan.style.borderColor = colorScheme.border;
+                            valueSpan.style.boxShadow = 'none';
+                        }
                     });
+                    
+                    // Add right-click handler for expansion
+                    if (canExpand) {
+                        valueSpan.addEventListener('contextmenu', (e) => {
+                            e.preventDefault();
+                            this.expandValue(part.label, columnKey, data, inputValues, yearData);
+                        });
+                    }
                     
                     span.appendChild(valueSpan);
                     parts.push({
@@ -382,7 +488,9 @@ export class FormulaModal {
                         label: part.label,
                         source: part.source,
                         index: index,
-                        colorScheme: colorScheme
+                        colorScheme: colorScheme,
+                        columnKey: columnKey,
+                        canExpand: canExpand
                     });
                 } else if (part.type === 'operator') {
                     const opSpan = document.createElement('span');
@@ -624,10 +732,194 @@ export class FormulaModal {
             this.resizeObserver.disconnect();
             this.resizeObserver = null;
         }
+        // Reset expansion state
+        this.expansionHistory = [];
+        this.backButton.style.display = 'none';
     }
 
     isVisible() {
         return this.overlay.style.display === 'flex';
+    }
+
+    expandValue(label, columnKey, data, inputValues, yearData) {
+        // Save current state to history
+        this.expansionHistory.push({
+            columnName: this.currentColumnName,
+            data: this.currentData,
+            inputValues: this.currentInputValues,
+            yearData: this.currentYearData,
+            breakdown: this.currentBreakdown
+        });
+        
+        // Get the column display name
+        const keyToNameMap = {
+            'principal_remaining': 'Principal Remaining',
+            'mortgage_payments': 'Mortgage Payments',
+            'principal_paid': 'Principal Paid',
+            'interest_paid': 'Interest Paid',
+            'maintenance_fees': 'Maintenance Fees',
+            'property_tax': 'Property Tax',
+            'insurance_paid': 'Insurance Paid',
+            'utilities': 'Utilities',
+            'repairs': 'Repairs',
+            'total_expenses': 'Total Expenses',
+            'deductible_expenses': 'Deductible Expenses',
+            'rental_income': 'Rental Income',
+            'taxable_income': 'Taxable Income',
+            'taxes_due': 'Taxes Due',
+            'net_profit': 'Net Profit',
+            'cumulative_investment': 'Cumulative Investment',
+            'expected_return': 'Expected Return',
+            'cumulative_expected_return': 'Cumulative Expected Return',
+            'home_value': 'Home Value',
+            'capital_gains_tax': 'Capital Gains Tax',
+            'sales_fees': 'Sales Fees',
+            'sale_income': 'Sale Income',
+            'sale_net': 'Sale Net',
+            'net_return': 'Net Return',
+            'return_percent': 'Return %',
+            'return_comparison': 'Return Comparison'
+        };
+        
+        const columnDisplayName = keyToNameMap[columnKey] || label;
+        
+        // Get the expanded breakdown
+        const expandedBreakdown = this.calculateBreakdown(columnDisplayName, data, inputValues, yearData);
+        
+        // Now we need to replace the value in the current formula with its expansion
+        // We'll rebuild the formula with the expanded value
+        const originalBreakdown = this.currentBreakdown;
+        const expandedExpression = this.buildExpandedExpression(
+            originalBreakdown.expression,
+            label,
+            expandedBreakdown.expression
+        );
+        
+        // Create new breakdown with expanded expression
+        const newBreakdown = {
+            expression: expandedExpression,
+            result: originalBreakdown.result,
+            note: originalBreakdown.note
+        };
+        
+        // Update current state
+        this.currentBreakdown = newBreakdown;
+        
+        // Rebuild the formula display
+        this.currentFormulaContent.innerHTML = '';
+        this.currentSvg.innerHTML = '';
+        this.labelColorMap.clear();
+        
+        const formulaParts = this.buildAnnotatedFormula(
+            newBreakdown,
+            this.currentFormulaContent,
+            this.currentSvg,
+            this.currentFormulaContainer,
+            data,
+            inputValues,
+            yearData
+        );
+        
+        // Recalculate annotations and resize
+        setTimeout(() => {
+            // Ensure formula fits
+            const containerWidth = this.currentFormulaContainer.getBoundingClientRect().width - 48;
+            const contentWidth = this.currentFormulaContent.scrollWidth;
+            
+            if (contentWidth > containerWidth) {
+                const currentSize = parseFloat(this.currentFormulaContent.style.fontSize) || 14;
+                const newSize = Math.max(10, currentSize * (containerWidth / contentWidth) * 0.95);
+                this.currentFormulaContent.style.fontSize = `${newSize}px`;
+            }
+            
+            this.calculateAndDrawAnnotations(formulaParts, newBreakdown, this.currentSvg, this.currentFormulaContainer);
+        }, 50);
+    }
+
+    buildExpandedExpression(originalExpression, labelToExpand, expansionExpression) {
+        const newExpression = [];
+        let foundValue = false;
+        
+        for (let i = 0; i < originalExpression.length; i++) {
+            const part = originalExpression[i];
+            
+            if (part.type === 'value' && part.label === labelToExpand && !foundValue) {
+                // Replace this value with its expansion, wrapped in parentheses
+                foundValue = true;
+                newExpression.push({ type: 'text', value: '(' });
+                
+                // Add the expansion expression (everything before the equals sign)
+                for (let j = 0; j < expansionExpression.length; j++) {
+                    const expPart = expansionExpression[j];
+                    // Stop at equals sign
+                    if (expPart.type === 'equals') {
+                        break;
+                    }
+                    newExpression.push(expPart);
+                }
+                
+                newExpression.push({ type: 'text', value: ')' });
+            } else {
+                newExpression.push(part);
+            }
+        }
+        
+        return newExpression;
+    }
+
+    goBack() {
+        if (this.expansionHistory.length === 0) {
+            this.backButton.style.display = 'none';
+            return;
+        }
+        
+        // Restore previous state
+        const previousState = this.expansionHistory.pop();
+        
+        // Update current state
+        this.currentColumnName = previousState.columnName;
+        this.currentData = previousState.data;
+        this.currentInputValues = previousState.inputValues;
+        this.currentYearData = previousState.yearData;
+        this.currentBreakdown = previousState.breakdown;
+        
+        // Update title
+        this.titleElement.textContent = previousState.columnName;
+        
+        // Hide back button if no more history
+        if (this.expansionHistory.length === 0) {
+            this.backButton.style.display = 'none';
+        }
+        
+        // Rebuild the formula display
+        this.currentFormulaContent.innerHTML = '';
+        this.currentSvg.innerHTML = '';
+        this.labelColorMap.clear();
+        
+        const formulaParts = this.buildAnnotatedFormula(
+            previousState.breakdown,
+            this.currentFormulaContent,
+            this.currentSvg,
+            this.currentFormulaContainer,
+            previousState.data,
+            previousState.inputValues,
+            previousState.yearData
+        );
+        
+        // Recalculate annotations and resize
+        setTimeout(() => {
+            // Ensure formula fits
+            const containerWidth = this.currentFormulaContainer.getBoundingClientRect().width - 48;
+            const contentWidth = this.currentFormulaContent.scrollWidth;
+            
+            if (contentWidth > containerWidth) {
+                const currentSize = parseFloat(this.currentFormulaContent.style.fontSize) || 14;
+                const newSize = Math.max(10, currentSize * (containerWidth / contentWidth) * 0.95);
+                this.currentFormulaContent.style.fontSize = `${newSize}px`;
+            }
+            
+            this.calculateAndDrawAnnotations(formulaParts, previousState.breakdown, this.currentSvg, this.currentFormulaContainer);
+        }, 50);
     }
 
     calculateBreakdown(columnName, data, inputValues, yearData = null) {
@@ -675,8 +967,8 @@ export class FormulaModal {
             'capital_gains_tax': 'capital_gains_tax',
             'sales_fees': 'sales_fees',
             'sale_income': 'sale_income',
-            'sale_gross': 'sale_gross',
             'sale_net': 'sale_net',
+            'net_return': 'net_return',
             'return_percent': 'return_percent',
             'return_%': 'return_percent',
             'return_comparison': 'return_comparison'
@@ -1014,7 +1306,7 @@ export class FormulaModal {
                 break;
             }
 
-            case 'sale_gross': {
+            case 'sale_net': {
                 const saleIncome = data.sale_income || 0;
                 const principalRemaining = data.principal_remaining || 0;
                 breakdown.expression = [
@@ -1022,23 +1314,23 @@ export class FormulaModal {
                     { type: 'operator', value: '−' },
                     { type: 'value', value: formatCurrency(principalRemaining), label: 'Principal Remaining', source: 'Principal Remaining column' },
                     { type: 'equals', value: '=' },
-                    { type: 'text', value: formatCurrency(data.sale_gross) }
-                ];
-                breakdown.result = formatCurrency(data.sale_gross);
-                break;
-            }
-
-            case 'sale_net': {
-                const saleGross = data.sale_gross || 0;
-                const cumulativeInvestment = data.cumulative_investment || 0;
-                breakdown.expression = [
-                    { type: 'value', value: formatCurrency(saleGross), label: 'Sale Gross', source: 'Sale Gross column' },
-                    { type: 'operator', value: '−' },
-                    { type: 'value', value: formatCurrency(cumulativeInvestment), label: 'Cumulative Investment', source: 'Cumulative Investment column' },
-                    { type: 'equals', value: '=' },
                     { type: 'text', value: formatCurrency(data.sale_net) }
                 ];
                 breakdown.result = formatCurrency(data.sale_net);
+                break;
+            }
+
+            case 'net_return': {
+                const saleNet = data.sale_net || 0;
+                const cumulativeInvestment = data.cumulative_investment || 0;
+                breakdown.expression = [
+                    { type: 'value', value: formatCurrency(saleNet), label: 'Sale Net', source: 'Sale Net column' },
+                    { type: 'operator', value: '−' },
+                    { type: 'value', value: formatCurrency(cumulativeInvestment), label: 'Cumulative Investment', source: 'Cumulative Investment column' },
+                    { type: 'equals', value: '=' },
+                    { type: 'text', value: formatCurrency(data.net_return) }
+                ];
+                breakdown.result = formatCurrency(data.net_return);
                 break;
             }
 
@@ -1806,13 +2098,13 @@ export class FormulaModal {
             }
 
             case 'return_comparison': {
-                // Return Comparison = Sale Net / Cumulative Expected Return
+                // Return Comparison = Net Return / Cumulative Expected Return
                 const cumulativeExpectedReturn = data.cumulative_expected_return || 0;
-                const saleNet = data.sale_net || 0;
-                const returnComparison = cumulativeExpectedReturn !== 0 ? saleNet / cumulativeExpectedReturn : 0;
+                const netReturn = data.net_return || 0;
+                const returnComparison = cumulativeExpectedReturn !== 0 ? netReturn / cumulativeExpectedReturn : 0;
                 
                 breakdown.expression = [
-                    { type: 'value', value: formatCurrency(saleNet), label: 'Sale Net', source: 'Sale Net column' },
+                    { type: 'value', value: formatCurrency(netReturn), label: 'Net Return', source: 'Net Return column' },
                     { type: 'operator', value: '÷' },
                     { type: 'value', value: formatCurrency(cumulativeExpectedReturn), label: 'Cumulative Expected Return', source: 'Cumulative Expected Return column' },
                     { type: 'equals', value: '=' },
@@ -1824,11 +2116,11 @@ export class FormulaModal {
             }
 
             case 'return_percent': {
-                const saleNet = data.sale_net || 0;
+                const netReturn = data.net_return || 0;
                 const cumulativeInvestment = data.cumulative_investment || 0;
-                const returnPercent = cumulativeInvestment > 0 ? (saleNet / cumulativeInvestment) * 100 : 0;
+                const returnPercent = cumulativeInvestment > 0 ? (netReturn / cumulativeInvestment) * 100 : 0;
                 breakdown.expression = [
-                    { type: 'value', value: formatCurrency(saleNet), label: 'Sale Net', source: 'Sale Net column' },
+                    { type: 'value', value: formatCurrency(netReturn), label: 'Net Return', source: 'Net Return column' },
                     { type: 'operator', value: '÷' },
                     { type: 'value', value: formatCurrency(cumulativeInvestment), label: 'Cumulative Investment', source: 'Cumulative Investment column' },
                     { type: 'operator', value: '×' },

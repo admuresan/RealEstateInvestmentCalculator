@@ -210,7 +210,7 @@ export class ReturnComparisonChart {
                         position: 'right',
                         title: {
                             display: true,
-                            text: 'Ratio (Sale Net / Cumulative Expected Return)'
+                            text: 'Ratio (Net Return / Cumulative Expected Return)'
                         },
                         ticks: {
                             callback: function (value) {
@@ -246,8 +246,8 @@ export class ReturnComparisonChart {
             this.chartData.labels.push(label);
             // Return if Invested = cumulative_expected_return (not the difference)
             this.chartData.returnIfInvested.push(result.cumulative_expected_return);
-            // Return on Purchase = sale_net
-            this.chartData.returnOnPurchase.push(result.sale_net);
+            // Return on Purchase = net_return
+            this.chartData.returnOnPurchase.push(result.net_return);
             // Return Comparison Ratio
             const returnComparison = result.return_comparison || 0;
             this.chartData.returnComparison.push(returnComparison);

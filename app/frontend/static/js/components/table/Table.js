@@ -38,8 +38,8 @@ export class Table {
             'sales_fees',
             'capital_gains_tax',
             'sale_income',
-            'sale_gross',
             'sale_net',
+            'net_return',
             'return_percent',
             'return_comparison'
         ];

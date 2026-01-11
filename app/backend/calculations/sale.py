@@ -117,40 +117,40 @@ def calculate_sale_income(home_value: float, sales_fees: float, capital_gains_ta
     return float(Decimal(str(home_value)) - Decimal(str(sales_fees)) - Decimal(str(capital_gains_tax)))
 
 
-def calculate_sale_gross(sale_income: float, principal_owing: float) -> float:
+def calculate_sale_net(sale_income: float, principal_owing: float) -> float:
     """
-    Calculate sale gross (sale income minus principal owing).
+    Calculate sale net (sale income minus principal owing).
     
     Args:
         sale_income: Sale income amount
         principal_owing: Principal remaining on mortgage
     
     Returns:
-        Sale gross
+        Sale net
     """
     return float(Decimal(str(sale_income)) - Decimal(str(principal_owing)))
 
 
-def calculate_sale_net(sale_gross: float, cumulative_investment: float) -> float:
+def calculate_net_return(sale_net: float, cumulative_investment: float) -> float:
     """
-    Calculate sale net (sale gross minus cumulative investment).
+    Calculate net return (sale net minus cumulative investment).
     
     Args:
-        sale_gross: Sale gross amount
+        sale_net: Sale net amount
         cumulative_investment: Cumulative investment made
     
     Returns:
-        Sale net
+        Net return
     """
-    return float(Decimal(str(sale_gross)) - Decimal(str(cumulative_investment)))
+    return float(Decimal(str(sale_net)) - Decimal(str(cumulative_investment)))
 
 
-def calculate_return_percent(sale_net: float, cumulative_investment: float) -> float:
+def calculate_return_percent(net_return: float, cumulative_investment: float) -> float:
     """
     Calculate return percentage based on cumulative investment.
     
     Args:
-        sale_net: Sale net amount
+        net_return: Net return amount
         cumulative_investment: Cumulative investment made
     
     Returns:
@@ -160,24 +160,24 @@ def calculate_return_percent(sale_net: float, cumulative_investment: float) -> f
     if ci <= 0:
         return 0.0
     
-    return float(Decimal(str(sale_net)) / ci)
+    return float(Decimal(str(net_return)) / ci)
 
 
-def calculate_return_comparison(cumulative_expected_return: float, sale_net: float) -> float:
+def calculate_return_comparison(cumulative_expected_return: float, net_return: float) -> float:
     """
     Calculate return comparison ratio.
-    Ratio of sale net to cumulative expected return.
+    Ratio of net return to cumulative expected return.
     
     Args:
         cumulative_expected_return: Cumulative expected return amount
-        sale_net: Sale net amount
+        net_return: Net return amount
     
     Returns:
-        Return comparison ratio (sale_net / cumulative_expected_return)
+        Return comparison ratio (net_return / cumulative_expected_return)
     """
     cer = Decimal(str(cumulative_expected_return))
     if cer == 0:
         return 0.0
     
-    return float(Decimal(str(sale_net)) / cer)
+    return float(Decimal(str(net_return)) / cer)
 

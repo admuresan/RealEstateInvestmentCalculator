@@ -38,8 +38,8 @@ from app.backend.calculations.sale import (
     calculate_sales_fees,
     calculate_capital_gains_tax_ontario,
     calculate_sale_income,
-    calculate_sale_gross,
     calculate_sale_net,
+    calculate_net_return,
     calculate_return_percent,
     calculate_return_comparison
 )
@@ -193,10 +193,10 @@ def calculate_investment():
             home_value_0, purchase_price, sales_fees_0, marginal_tax_rate
         )
         sale_income_0 = calculate_sale_income(home_value_0, sales_fees_0, capital_gains_tax_0)
-        sale_gross_0 = calculate_sale_gross(sale_income_0, loan_principal)
-        sale_net_0 = calculate_sale_net(sale_gross_0, downpayment)
-        return_percent_0 = calculate_return_percent(sale_net_0, downpayment)
-        return_comparison_0 = calculate_return_comparison(0.0, sale_net_0)  # cumulative_expected_return is 0.0 for month 0
+        sale_net_0 = calculate_sale_net(sale_income_0, loan_principal)
+        net_return_0 = calculate_net_return(sale_net_0, downpayment)
+        return_percent_0 = calculate_return_percent(net_return_0, downpayment)
+        return_comparison_0 = calculate_return_comparison(0.0, net_return_0)  # cumulative_expected_return is 0.0 for month 0
         
         result_row = {
             'month': 0,
@@ -223,8 +223,8 @@ def calculate_investment():
             'capital_gains_tax': capital_gains_tax_0,
             'sales_fees': sales_fees_0,
             'sale_income': sale_income_0,
-            'sale_gross': sale_gross_0,
             'sale_net': sale_net_0,
+            'net_return': net_return_0,
             'return_percent': return_percent_0 * 100,  # Convert to percentage
             'return_comparison': return_comparison_0
         }
@@ -286,10 +286,10 @@ def calculate_investment():
                 home_value, purchase_price, sales_fees, marginal_tax_rate
             )
             sale_income = calculate_sale_income(home_value, sales_fees, capital_gains_tax)
-            sale_gross = calculate_sale_gross(sale_income, principal_remaining)
-            sale_net = calculate_sale_net(sale_gross, cumulative_investment)
-            return_percent = calculate_return_percent(sale_net, cumulative_investment)
-            return_comparison = calculate_return_comparison(cumulative_expected_return, sale_net)
+            sale_net = calculate_sale_net(sale_income, principal_remaining)
+            net_return = calculate_net_return(sale_net, cumulative_investment)
+            return_percent = calculate_return_percent(net_return, cumulative_investment)
+            return_comparison = calculate_return_comparison(cumulative_expected_return, net_return)
             
             # Build result row
             # Note: Values are kept at full Decimal precision (converted to float)
@@ -319,8 +319,8 @@ def calculate_investment():
                 'capital_gains_tax': capital_gains_tax,
                 'sales_fees': sales_fees,
                 'sale_income': sale_income,
-                'sale_gross': sale_gross,
                 'sale_net': sale_net,
+                'net_return': net_return,
                 'return_percent': return_percent * 100,  # Convert to percentage
                 'return_comparison': return_comparison
             }

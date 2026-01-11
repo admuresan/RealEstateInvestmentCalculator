@@ -56,8 +56,8 @@ export class TableRow {
             'capital_gains_tax': 'Capital Gains Tax',
             'sales_fees': 'Sales Fees',
             'sale_income': 'Sale Income',
-            'sale_gross': 'Sale Gross',
             'sale_net': 'Sale Net',
+            'net_return': 'Net Return',
             'return_percent': 'Return %',
             'return_comparison': 'Return Comparison'
         };
@@ -119,8 +119,8 @@ export class TableRow {
         this.cells.get('capital_gains_tax').textContent = this.formatCurrency(data.capital_gains_tax);
         this.cells.get('sales_fees').textContent = this.formatCurrency(data.sales_fees);
         this.cells.get('sale_income').textContent = this.formatCurrency(data.sale_income);
-        this.cells.get('sale_gross').textContent = this.formatCurrency(data.sale_gross);
         this.cells.get('sale_net').textContent = this.formatCurrency(data.sale_net);
+        this.cells.get('net_return').textContent = this.formatCurrency(data.net_return);
         this.cells.get('return_percent').textContent = this.formatPercent(data.return_percent);
         this.cells.get('return_comparison').textContent = this.formatRatio(data.return_comparison);
     }

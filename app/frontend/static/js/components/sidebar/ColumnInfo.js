@@ -135,27 +135,27 @@ export const COLUMN_DEFINITIONS = [
         aggregationNote: 'Summary shows the final month value of the year.'
     },
     {
-        name: 'Sale Gross',
+        name: 'Sale Net',
         description: 'Sale income minus principal owing on the mortgage.',
         formula: 'Sale Income - Principal Remaining',
         aggregationNote: 'Summary shows the final month value of the year.'
     },
     {
-        name: 'Sale Net',
-        description: 'Sale gross minus cumulative investment made into the property.',
-        formula: 'Sale Gross - Cumulative Investment',
+        name: 'Net Return',
+        description: 'Sale net minus cumulative investment made into the property.',
+        formula: 'Sale Net - Cumulative Investment',
         aggregationNote: 'Summary shows the final month value of the year.'
     },
     {
         name: 'Return %',
         description: 'Return percentage based on cumulative investment.',
-        formula: '(Sale Net / Cumulative Investment) × 100',
+        formula: '(Net Return / Cumulative Investment) × 100',
         aggregationNote: 'Summary shows the final month value of the year.'
     },
     {
         name: 'Return Comparison',
-        description: 'Ratio comparing sale net to cumulative expected return.',
-        formula: 'Sale Net / Cumulative Expected Return',
+        description: 'Ratio comparing net return to cumulative expected return.',
+        formula: 'Net Return / Cumulative Expected Return',
         aggregationNote: 'Summary shows the final month value of the year.'
     }
 ];

@@ -100,8 +100,8 @@ export class YearGroupRow {
         summary['capital_gains_tax'] = lastMonth.capital_gains_tax;
         summary['sales_fees'] = lastMonth.sales_fees;
         summary['sale_income'] = lastMonth.sale_income;
-        summary['sale_gross'] = lastMonth.sale_gross;
         summary['sale_net'] = lastMonth.sale_net;
+        summary['net_return'] = lastMonth.net_return;
         summary['return_percent'] = lastMonth.return_percent;
         summary['return_comparison'] = lastMonth.return_comparison;
         // Display summaries
@@ -163,8 +163,8 @@ export class YearGroupRow {
             'capital_gains_tax': 'Capital Gains Tax',
             'sales_fees': 'Sales Fees',
             'sale_income': 'Sale Income',
-            'sale_gross': 'Sale Gross',
             'sale_net': 'Sale Net',
+            'net_return': 'Net Return',
             'return_percent': 'Return %',
             'return_comparison': 'Return Comparison'
         };

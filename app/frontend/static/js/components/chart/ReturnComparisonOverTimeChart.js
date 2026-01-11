@@ -147,7 +147,7 @@ export class ReturnComparisonOverTimeChart {
                     y: {
                         title: {
                             display: true,
-                            text: 'Ratio (Sale Net / Cumulative Expected Return)'
+                            text: 'Ratio (Net Return / Cumulative Expected Return)'
                         },
                         ticks: {
                             callback: function (value) {
@@ -191,7 +191,7 @@ export class ReturnComparisonOverTimeChart {
             // Create label - use cumulative month number
             const label = `${result.month}`;
             this.chartData.labels.push(label);
-            // Return Comparison = sale_net / cumulative_expected_return
+            // Return Comparison = net_return / cumulative_expected_return
             const returnComparison = result.return_comparison || 0;
             this.chartData.returnComparison.push(returnComparison);
         });

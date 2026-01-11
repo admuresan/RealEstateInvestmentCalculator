@@ -72,22 +72,18 @@ export class InvestmentSummary {
         const downpaymentPercent = inputValues.get('downpayment_percentage') || 0;
         const downpayment = purchasePrice * (downpaymentPercent / 100);
         
-        // Calculate total investment: downpayment + sum of all negative net profits
-        // Positive profits are returns, not investments
-        // Negative profits are additional cash invested into the property
+        // Calculate total investment: downpayment - sum of all net profits
         let totalInvestment = downpayment;
         results.forEach(result => {
-            if (result.net_profit < 0) {
-                totalInvestment += Math.abs(result.net_profit); // Add negative profits as investment
-            }
+            totalInvestment -= (result.net_profit || 0);
         });
         
         // Recalculate metrics using correct totalInvestment
-        // Backend calculates: sale_net = sale_gross - cumulative_investment
-        // We need to recalculate using actual totalInvestment (downpayment + negative net profits)
-        const saleGross = finalResult.sale_gross || 0;
-        const saleNet = saleGross - totalInvestment;
-        const totalReturn = saleNet;
+        // Backend calculates: net_return = sale_net - cumulative_investment
+        // We need to recalculate using actual totalInvestment (downpayment - sum of all net profits)
+        const saleNet = finalResult.sale_net || 0;
+        const netReturn = saleNet - totalInvestment;
+        const totalReturn = netReturn;
         const returnPercent = totalInvestment > 0 ? (totalReturn / totalInvestment) * 100 : 0;
         const returnComparison = finalResult.return_comparison || 0;
         const expectedReturnRate = inputValues.get('expected_return_rate') || 0;
@@ -202,19 +198,19 @@ export class InvestmentSummary {
         const downpayment = purchasePrice * (downpaymentPercent / 100);
         
         // Calculate total investment up to this year
-        // Total investment = downpayment + sum of all negative net profits up to this point
+        // Total investment = downpayment - sum of all net profits up to this point
         let totalInvestment = downpayment;
         results.forEach(result => {
-            if (result.month <= targetMonth && result.net_profit < 0) {
-                totalInvestment += Math.abs(result.net_profit);
+            if (result.month <= targetMonth) {
+                totalInvestment -= (result.net_profit || 0);
             }
         });
         
-        // Use sale_net from backend which is already calculated as sale_gross - cumulative_investment
+        // Use net_return from backend which is already calculated as sale_net - cumulative_investment
         // But we need to recalculate using our totalInvestment calculation for consistency
-        const saleGross = yearResult.sale_gross || 0;
-        const saleNet = saleGross - totalInvestment;
-        const totalReturn = saleNet;
+        const saleNet = yearResult.sale_net || 0;
+        const netReturn = saleNet - totalInvestment;
+        const totalReturn = netReturn;
         const returnPercent = totalInvestment > 0 ? (totalReturn / totalInvestment) * 100 : 0;
         const returnComparison = yearResult.return_comparison || 0;
         const cumulativeExpectedReturn = yearResult.cumulative_expected_return || 0;
@@ -344,14 +340,12 @@ export class InvestmentSummary {
             
             let totalInvestment = downpayment;
             results.forEach(result => {
-                if (result.net_profit < 0) {
-                    totalInvestment += Math.abs(result.net_profit);
-                }
+                totalInvestment -= (result.net_profit || 0);
             });
             
-            const saleGross = finalResult.sale_gross || 0;
-            const saleNet = saleGross - totalInvestment;
-            const totalReturn = saleNet;
+            const saleNet = finalResult.sale_net || 0;
+            const netReturn = saleNet - totalInvestment;
+            const totalReturn = netReturn;
             const returnPercent = totalInvestment > 0 ? (totalReturn / totalInvestment) * 100 : 0;
             const returnComparison = finalResult.return_comparison || 0;
             const cumulativeExpectedReturn = finalResult.cumulative_expected_return || 0;
