@@ -94,4 +94,3 @@ app/
 6. View the calculated results in the table
 
 Hover over column headers in the table to see detailed explanations and formulas for each metric.
-
