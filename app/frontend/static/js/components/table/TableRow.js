@@ -2,12 +2,13 @@
  * Table row component for displaying a single month's data.
  */
 export class TableRow {
-    constructor(parent, columns, formulaModal, columnDefinitions, inputValues) {
+    constructor(parent, columns, formulaModal, columnDefinitions, inputValues, table = null) {
         this.cells = new Map();
         this.row = document.createElement('tr');
         this.row.className = 'data-row';
         this.formulaModal = formulaModal;
         this.columnDefinitions = columnDefinitions;
+        this.table = table; // Store reference to table for fresh input values
         this.inputValues = inputValues;
         this.rowData = null;
         columns.forEach(column => {
@@ -69,12 +70,19 @@ export class TableRow {
             return def.name === displayName;
         });
         
+        // Get fresh input values if we have access to inputGroups (from table)
+        // Otherwise use the stored inputValues
+        let currentInputValues = this.inputValues;
+        if (this.table && this.table.inputGroups) {
+            currentInputValues = this.table.getInputValues();
+        }
+        
         if (columnDef) {
             this.formulaModal.show(
                 columnDef.name,
                 columnDef.formula,
                 this.rowData,
-                this.inputValues
+                currentInputValues
             );
         } else {
             // Fallback: show basic info even if no definition found
@@ -82,7 +90,7 @@ export class TableRow {
                 displayName,
                 'No formula available',
                 this.rowData,
-                this.inputValues
+                currentInputValues
             );
         }
     }

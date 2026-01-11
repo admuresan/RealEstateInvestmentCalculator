@@ -78,11 +78,14 @@ export class InvestmentSummary {
         const purchasePrice = inputValues.get('purchase_price') || 0;
         const downpaymentPercent = inputValues.get('downpayment_percentage') || 0;
         const downpayment = purchasePrice * (downpaymentPercent / 100);
+        const closingCosts = inputValues.get('closing_costs') || 0;
+        const landTransferTax = inputValues.get('land_transfer_tax') || 0;
+        const totalInitialInvestment = downpayment + closingCosts + landTransferTax;
         
         // Use backend-calculated values (new calculation method)
-        // Cumulative Investment = Downpayment + max(0, -Cumulative Rental Gains)
-        // Net Return = (Sale Net - Downpayment) + max(0, Cumulative Rental Gains)
-        const totalInvestment = finalResult.cumulative_investment || downpayment;
+        // Cumulative Investment = Total Initial Investment + max(0, -Cumulative Rental Gains)
+        // Net Return = (Sale Net - Total Initial Investment) + max(0, Cumulative Rental Gains)
+        const totalInvestment = finalResult.cumulative_investment || totalInitialInvestment;
         const netReturn = finalResult.net_return || 0;
         const totalReturn = netReturn;
         const returnPercent = finalResult.return_percent || 0;
@@ -156,7 +159,7 @@ export class InvestmentSummary {
             <div class="summary-section">
                 <h4 class="summary-section-title">💡 Key Insights</h4>
                 <ul class="summary-insights">
-                    ${this.generateInsights(finalResult, totalReturn, returnPercent, returnComparison, expectedReturnRate, cumulativeExpectedReturn, homeValue, purchasePrice, numYears, downpayment)}
+                    ${this.generateInsights(finalResult, totalReturn, returnPercent, returnComparison, expectedReturnRate, cumulativeExpectedReturn, homeValue, purchasePrice, numYears, totalInitialInvestment, downpayment)}
                 </ul>
             </div>
 
@@ -437,7 +440,7 @@ export class InvestmentSummary {
         });
     }
 
-    generateInsights(finalResult, totalReturn, returnPercent, returnComparison, expectedReturnRate, cumulativeExpectedReturn, homeValue, purchasePrice, numYears, downpayment) {
+    generateInsights(finalResult, totalReturn, returnPercent, returnComparison, expectedReturnRate, cumulativeExpectedReturn, homeValue, purchasePrice, numYears, totalInitialInvestment, downpayment) {
         const insights = [];
 
         // Return comparison insight
@@ -469,7 +472,7 @@ export class InvestmentSummary {
         if (initialLoanAmount > 0 && finalResult.principal_remaining !== undefined) {
             const remainingLoan = finalResult.principal_remaining || 0;
             const principalPaid = initialLoanAmount - remainingLoan;
-            insights.push(`<li><strong>Leverage Impact:</strong> Using mortgage financing (initial loan: ${this.formatCurrency(initialLoanAmount)}) amplifies your returns. Your initial downpayment of ${this.formatCurrency(downpayment)} has generated ${this.formatCurrency(totalReturn)} in returns.</li>`);
+            insights.push(`<li><strong>Leverage Impact:</strong> Using mortgage financing (initial loan: ${this.formatCurrency(initialLoanAmount)}) amplifies your returns. Your initial investment of ${this.formatCurrency(totalInitialInvestment)} (including downpayment, closing costs, and land transfer tax) has generated ${this.formatCurrency(totalReturn)} in returns.</li>`);
         }
 
         // Tax benefits insight
@@ -522,13 +525,19 @@ export class InvestmentSummary {
         // but note that it's the sum across all months
         let formula = columnDef.formula;
         let title = columnName;
+        let yearDataForModal = null; // Default to null for final value display
         
         if (metricLabel === 'Total Rental Gains') {
             const numMonths = results ? results.length : 0;
             formula = columnDef.formula + ` (summed across ${numMonths} months)`;
             title = `${columnName} (Total - Sum of All Months)`;
+            // For Total Rental Gains, pass all results so it can show the cumulative calculation
+            yearDataForModal = results;
         } else {
             title = `${columnName} (Final Value)`;
+            // For other metrics (like Cumulative Expected Return), pass null to show as final value, not year summary
+            // The data object already contains the final month's values
+            yearDataForModal = null;
         }
 
         this.formulaModal.show(
@@ -536,7 +545,7 @@ export class InvestmentSummary {
             formula,
             data,
             inputValues,
-            results // Pass all results as yearData for proper calculation
+            yearDataForModal
         );
 
         // Update title if needed

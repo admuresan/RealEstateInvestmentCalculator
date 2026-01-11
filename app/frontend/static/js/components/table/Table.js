@@ -390,7 +390,7 @@ export class Table {
         
         // Add month 0 row first (always visible)
         if (month0Result) {
-            const row = new TableRow(this.tbody, this.columns, this.formulaModal, this.columnDefinitions, inputValues);
+            const row = new TableRow(this.tbody, this.columns, this.formulaModal, this.columnDefinitions, inputValues, this);
             row.updateData(month0Result);
             this.rows.push(row);
         }
@@ -403,7 +403,7 @@ export class Table {
             this.yearGroups.push(yearGroup);
             // Create month rows for this year
             yearResults.forEach(result => {
-                const row = new TableRow(this.tbody, this.columns, this.formulaModal, this.columnDefinitions, inputValues);
+                const row = new TableRow(this.tbody, this.columns, this.formulaModal, this.columnDefinitions, inputValues, this);
                 row.updateData(result);
                 this.rows.push(row);
                 yearGroup.addMonthRow(row.getRowElement());

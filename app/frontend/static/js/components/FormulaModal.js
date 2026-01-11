@@ -63,6 +63,7 @@ export class FormulaModal {
             'Expected Return': 'expected_return',
             'Cumulative Expected Return': 'cumulative_expected_return',
             'Previous Cumulative Expected Return': 'cumulative_expected_return',
+            'Current Year Summary Expected Return': 'expected_return',
             'Current Rental Gains': 'rental_gains',
             'Previous Cumulative Rental Gains': 'cumulative_rental_gains',
             'Cumulative Losses': 'cumulative_rental_gains',
@@ -447,12 +448,15 @@ export class FormulaModal {
                     // Check if this value can be expanded
                     // A value is expandable if:
                     // 1. It has a corresponding column key in our mapping
-                    // 2. The data object has that property (meaning it's a computed column value)
+                    // 2. The data object has that property (meaning it's a computed column value) OR we have yearData (for year summaries)
                     // 3. The source indicates it's from a column (not an input)
                     const columnKey = this.labelToColumnKey[part.label];
-                    const hasColumnKey = columnKey && data && data.hasOwnProperty(columnKey);
+                    const hasColumnKey = columnKey !== undefined;
+                    const hasDataProperty = columnKey && data && data.hasOwnProperty(columnKey);
+                    const hasYearData = columnKey && yearData && yearData.length > 0;
                     const isFromColumn = part.source && (part.source.includes('column') || part.source.includes('Column'));
-                    const canExpand = hasColumnKey && isFromColumn;
+                    // Allow expansion if we have the column key, it's from a column, and either the data has the property or we have yearData
+                    const canExpand = hasColumnKey && isFromColumn && (hasDataProperty || hasYearData);
                     
                     const valueSpan = document.createElement('span');
                     valueSpan.className = `formula-value-${index}`;
@@ -846,8 +850,39 @@ export class FormulaModal {
         
         const columnDisplayName = keyToNameMap[columnKey] || label;
         
+        // Special handling: When expanding "Current Rental Gains" from Cumulative Rental Gains,
+        // we want to show single month values, not summed values
+        let expansionYearData = yearData;
+        let expansionData = data;
+        
+        if ((label === 'Current Rental Gains' || columnKey === 'rental_gains') && 
+            this.currentColumnName === 'Cumulative Rental Gains' && 
+            yearData && yearData.length > 0) {
+            // For Cumulative Rental Gains, "Current Rental Gains" should show just the current month
+            // Use the last month of the year for year summaries, or the current month for regular rows
+            const monthData = yearData.length > 0 ? yearData[yearData.length - 1] : data;
+            expansionData = monthData;
+            expansionYearData = null; // Pass null to force single month calculation
+        }
+        
+        // Special handling: When expanding "Current Year Summary Expected Return" from Cumulative Expected Return,
+        // we want to show the expected_return breakdown for the year (summed)
+        if ((label === 'Current Year Summary Expected Return' || columnKey === 'expected_return') && 
+            this.currentColumnName === 'Cumulative Expected Return' && 
+            yearData && yearData.length > 0) {
+            // For year summaries, create a data object with the summed expected_return
+            const totalExpectedReturn = yearData.reduce((sum, month) => sum + (month.expected_return || 0), 0);
+            expansionData = {
+                ...data,
+                expected_return: totalExpectedReturn,
+                cumulative_investment: yearData[yearData.length - 1].cumulative_investment || 0
+            };
+            // Keep yearData so it shows the sum breakdown
+            expansionYearData = yearData;
+        }
+        
         // Get the expanded breakdown
-        const expandedBreakdown = this.calculateBreakdown(columnDisplayName, data, inputValues, yearData);
+        const expandedBreakdown = this.calculateBreakdown(columnDisplayName, expansionData, inputValues, expansionYearData);
         
         // Now we need to replace the value in the current formula with its expansion
         // We'll rebuild the formula with the expanded value
@@ -878,9 +913,9 @@ export class FormulaModal {
             this.currentFormulaContent,
             this.currentSvg,
             this.currentFormulaContainer,
-            data,
+            expansionData,
             inputValues,
-            yearData
+            expansionYearData
         );
         
         // Recalculate annotations and resize
@@ -1553,15 +1588,38 @@ export class FormulaModal {
             }
 
             case 'net_return': {
-                // New calculation: Net Return = (Sale Net - Downpayment) + max(0, Cumulative Rental Gains)
+                // New calculation: Net Return = (Sale Net - Total Initial Investment) + max(0, Cumulative Rental Gains)
                 const saleNet = data.sale_net || 0;
                 const purchasePrice = inputValues.get('purchase_price') || 0;
                 const downpaymentPercent = (inputValues.get('downpayment_percentage') || 0) / 100;
                 const downpayment = purchasePrice * downpaymentPercent;
+                // Handle closing_costs - ensure we get a number, defaulting to 0 if null/undefined
+                // Check if key exists in Map first
+                let closingCosts = inputValues.has('closing_costs') ? inputValues.get('closing_costs') : undefined;
+                if (closingCosts === null || closingCosts === undefined) {
+                    closingCosts = 0;
+                } else {
+                    closingCosts = Number(closingCosts);
+                    if (isNaN(closingCosts)) {
+                        closingCosts = 0;
+                    }
+                }
+                // Handle land_transfer_tax - ensure we get a number, defaulting to 0 if null/undefined
+                // Check if key exists in Map first
+                let landTransferTax = inputValues.has('land_transfer_tax') ? inputValues.get('land_transfer_tax') : undefined;
+                if (landTransferTax === null || landTransferTax === undefined) {
+                    landTransferTax = 0;
+                } else {
+                    landTransferTax = Number(landTransferTax);
+                    if (isNaN(landTransferTax)) {
+                        landTransferTax = 0;
+                    }
+                }
+                const totalInitialInvestment = downpayment + closingCosts + landTransferTax;
                 
                 // Use cumulative rental gains directly from the data
                 const cumulativeNetProfit = data.cumulative_rental_gains || 0;
-                const profitFromSale = saleNet - downpayment;
+                const profitFromSale = saleNet - totalInitialInvestment;
                 const profitsReceived = Math.max(0, cumulativeNetProfit);
                 const netReturn = data.net_return || 0;
                 
@@ -1571,7 +1629,7 @@ export class FormulaModal {
                         { type: 'text', value: '(' },
                         { type: 'value', value: formatCurrency(saleNet), label: 'Sale Net', source: 'Sale Net column' },
                         { type: 'operator', value: '−' },
-                        { type: 'value', value: formatCurrency(downpayment), label: 'Downpayment', source: 'Initial Investment' },
+                        { type: 'value', value: formatCurrency(totalInitialInvestment), label: 'Total Initial Investment', source: `Downpayment (${formatCurrency(downpayment)}) + Closing Costs (${formatCurrency(closingCosts)}) + Land Transfer Tax (${formatCurrency(landTransferTax)})` },
                         { type: 'text', value: ')' },
                         { type: 'operator', value: '+' },
                         { type: 'value', value: formatCurrency(profitsReceived), label: 'Cumulative Rental Gains', source: `Cumulative Rental Gains column: ${formatCurrency(cumulativeNetProfit)} (positive = gains received)` },
@@ -1584,7 +1642,7 @@ export class FormulaModal {
                         { type: 'text', value: '(' },
                         { type: 'value', value: formatCurrency(saleNet), label: 'Sale Net', source: 'Sale Net column' },
                         { type: 'operator', value: '−' },
-                        { type: 'value', value: formatCurrency(downpayment), label: 'Downpayment', source: 'Initial Investment' },
+                        { type: 'value', value: formatCurrency(totalInitialInvestment), label: 'Total Initial Investment', source: `Downpayment (${formatCurrency(downpayment)}) + Closing Costs (${formatCurrency(closingCosts)}) + Land Transfer Tax (${formatCurrency(landTransferTax)})` },
                         { type: 'text', value: ')' },
                         { type: 'operator', value: '+' },
                         { type: 'value', value: formatCurrency(0), label: 'Cumulative Rental Gains (if positive)', source: `Cumulative Rental Gains column: ${formatCurrency(cumulativeNetProfit)} (negative or zero, so 0 added)` },
@@ -2087,12 +2145,35 @@ export class FormulaModal {
             }
 
             case 'cumulative_investment': {
-                // New calculation: Cumulative Investment = Downpayment + max(0, -Cumulative Rental Gains)
+                // New calculation: Cumulative Investment = Total Initial Investment + max(0, -Cumulative Rental Gains)
                 // If cumulative rental gains is negative (losses), add to investment
-                // If cumulative rental gains is positive, investment stays at downpayment
+                // If cumulative rental gains is positive, investment stays at total initial investment
                 const purchasePrice = inputValues.get('purchase_price') || 0;
                 const downpaymentPercent = (inputValues.get('downpayment_percentage') || 0) / 100;
                 const downpayment = purchasePrice * downpaymentPercent;
+                // Handle closing_costs - ensure we get a number, defaulting to 0 if null/undefined
+                // Check if key exists in Map first
+                let closingCosts = inputValues.has('closing_costs') ? inputValues.get('closing_costs') : undefined;
+                if (closingCosts === null || closingCosts === undefined) {
+                    closingCosts = 0;
+                } else {
+                    closingCosts = Number(closingCosts);
+                    if (isNaN(closingCosts)) {
+                        closingCosts = 0;
+                    }
+                }
+                // Handle land_transfer_tax - ensure we get a number, defaulting to 0 if null/undefined
+                // Check if key exists in Map first
+                let landTransferTax = inputValues.has('land_transfer_tax') ? inputValues.get('land_transfer_tax') : undefined;
+                if (landTransferTax === null || landTransferTax === undefined) {
+                    landTransferTax = 0;
+                } else {
+                    landTransferTax = Number(landTransferTax);
+                    if (isNaN(landTransferTax)) {
+                        landTransferTax = 0;
+                    }
+                }
+                const totalInitialInvestment = downpayment + closingCosts + landTransferTax;
                 const currentCumulative = data.cumulative_investment || 0;
                 
                 // Use cumulative rental gains directly from the data
@@ -2100,14 +2181,20 @@ export class FormulaModal {
                 const losses = Math.max(0, -cumulativeNetProfit);
                 
                 if (data.month === 0) {
-                    // Month 0: just downpayment
+                    // Month 0: total initial investment (downpayment + closing costs + land transfer tax)
                     breakdown.expression = [
-                        { type: 'value', value: formatCurrency(downpayment), label: 'Downpayment', source: `Purchase Price (${formatCurrency(purchasePrice)}) × Downpayment % (${formatPercent(downpaymentPercent)})` }
+                        { type: 'value', value: formatCurrency(downpayment), label: 'Downpayment', source: `Purchase Price (${formatCurrency(purchasePrice)}) × Downpayment % (${formatPercent(downpaymentPercent)})` },
+                        { type: 'operator', value: '+' },
+                        { type: 'value', value: formatCurrency(closingCosts), label: 'Closing Costs', source: 'Input' },
+                        { type: 'operator', value: '+' },
+                        { type: 'value', value: formatCurrency(landTransferTax), label: 'Land Transfer Tax', source: 'Input (Ontario rates)' },
+                        { type: 'equals', value: '=' },
+                        { type: 'text', value: formatCurrency(totalInitialInvestment) }
                     ];
                 } else if (yearData && yearData.length > 0 && losses > 0) {
                     // Summary row with losses
                     breakdown.expression = [
-                        { type: 'value', value: formatCurrency(downpayment), label: 'Downpayment', source: 'Initial Investment' },
+                        { type: 'value', value: formatCurrency(totalInitialInvestment), label: 'Total Initial Investment', source: `Downpayment (${formatCurrency(downpayment)}) + Closing Costs (${formatCurrency(closingCosts)}) + Land Transfer Tax (${formatCurrency(landTransferTax)})` },
                         { type: 'operator', value: '+' },
                         { type: 'value', value: formatCurrency(losses), label: 'Cumulative Losses', source: `Cumulative Rental Gains column: ${formatCurrency(cumulativeNetProfit)} (negative = losses)` },
                         { type: 'equals', value: '=' },
@@ -2116,16 +2203,16 @@ export class FormulaModal {
                 } else if (losses > 0) {
                     // Single row with losses
                     breakdown.expression = [
-                        { type: 'value', value: formatCurrency(downpayment), label: 'Downpayment', source: 'Initial Investment' },
+                        { type: 'value', value: formatCurrency(totalInitialInvestment), label: 'Total Initial Investment', source: `Downpayment (${formatCurrency(downpayment)}) + Closing Costs (${formatCurrency(closingCosts)}) + Land Transfer Tax (${formatCurrency(landTransferTax)})` },
                         { type: 'operator', value: '+' },
                         { type: 'value', value: formatCurrency(losses), label: 'Cumulative Losses', source: `Cumulative Rental Gains column: ${formatCurrency(cumulativeNetProfit)} (negative = losses)` },
                         { type: 'equals', value: '=' },
                         { type: 'text', value: formatCurrency(currentCumulative) }
                     ];
                 } else {
-                    // No losses, investment equals downpayment
+                    // No losses, investment equals total initial investment
                     breakdown.expression = [
-                        { type: 'value', value: formatCurrency(downpayment), label: 'Downpayment', source: 'Initial Investment (no losses to add)' }
+                        { type: 'value', value: formatCurrency(totalInitialInvestment), label: 'Total Initial Investment', source: `Downpayment (${formatCurrency(downpayment)}) + Closing Costs (${formatCurrency(closingCosts)}) + Land Transfer Tax (${formatCurrency(landTransferTax)}) (no losses to add)` }
                     ];
                 }
                 
@@ -2224,7 +2311,10 @@ export class FormulaModal {
                         const purchasePrice = inputValues.get('purchase_price') || 0;
                         const downpaymentPercent = (inputValues.get('downpayment_percentage') || 0) / 100;
                         const downpayment = purchasePrice * downpaymentPercent;
-                        lastMonthPreviousCumulativeExpectedReturn = downpayment;
+                        const closingCosts = inputValues.get('closing_costs') ?? 0;
+                        const landTransferTax = inputValues.get('land_transfer_tax') ?? 0;
+                        const totalInitialInvestment = downpayment + closingCosts + landTransferTax;
+                        lastMonthPreviousCumulativeExpectedReturn = totalInitialInvestment;
                     } else {
                         lastMonthPreviousCumulativeExpectedReturn = lastMonthCumulativeExpectedReturn / (1 + monthlyRate) + lastMonthNetProfit;
                     }
@@ -2236,7 +2326,7 @@ export class FormulaModal {
                         { type: 'text', value: '(' },
                         { type: 'value', value: formatCurrency(lastMonthCumulativeInvestment), label: 'Cumulative Investment', source: 'Cumulative Investment column (final month)' },
                         { type: 'operator', value: '+' },
-                        { type: 'value', value: formatCurrency(lastMonthPreviousCumulativeExpectedReturn), label: 'Previous Cumulative Expected Return', source: (lastMonth.month || 0) === 1 ? 'Downpayment' : `Cumulative Expected Return column (Month ${(lastMonth.month || 0) - 1})` },
+                        { type: 'value', value: formatCurrency(lastMonthPreviousCumulativeExpectedReturn), label: 'Previous Cumulative Expected Return', source: (lastMonth.month || 0) === 1 ? 'Total Initial Investment' : `Cumulative Expected Return column (Month ${(lastMonth.month || 0) - 1})` },
                         { type: 'text', value: ') × ' },
                         { type: 'value', value: formatPercent(monthlyRate), label: 'Monthly Expected Return Rate', source: `Annual Rate (${formatPercent(expectedReturnRate)}) ÷ 12` },
                         { type: 'equals', value: '=' },
@@ -2259,7 +2349,10 @@ export class FormulaModal {
                         const purchasePrice = inputValues.get('purchase_price') || 0;
                         const downpaymentPercent = (inputValues.get('downpayment_percentage') || 0) / 100;
                         const downpayment = purchasePrice * downpaymentPercent;
-                        previousCumulativeExpectedReturn = downpayment;
+                        const closingCosts = inputValues.get('closing_costs') ?? 0;
+                        const landTransferTax = inputValues.get('land_transfer_tax') ?? 0;
+                        const totalInitialInvestment = downpayment + closingCosts + landTransferTax;
+                        previousCumulativeExpectedReturn = totalInitialInvestment;
                     } else {
                         previousCumulativeExpectedReturn = currentCumulativeExpectedReturn / (1 + monthlyRate) + netProfit;
                     }
@@ -2270,7 +2363,7 @@ export class FormulaModal {
                         { type: 'text', value: '(' },
                         { type: 'value', value: formatCurrency(cumulativeInvestment), label: 'Cumulative Investment', source: 'Cumulative Investment column' },
                         { type: 'operator', value: '+' },
-                        { type: 'value', value: formatCurrency(previousCumulativeExpectedReturn), label: 'Previous Cumulative Expected Return', source: data.month === 1 ? 'Downpayment' : `Cumulative Expected Return column (Month ${(data.month || 0) - 1})` },
+                        { type: 'value', value: formatCurrency(previousCumulativeExpectedReturn), label: 'Previous Cumulative Expected Return', source: data.month === 1 ? 'Total Initial Investment' : `Cumulative Expected Return column (Month ${(data.month || 0) - 1})` },
                         { type: 'text', value: ') × ' },
                         { type: 'value', value: formatPercent(monthlyRate), label: 'Monthly Expected Return Rate', source: `Annual Rate (${formatPercent(expectedReturnRate)}) ÷ 12` },
                         { type: 'equals', value: '=' },

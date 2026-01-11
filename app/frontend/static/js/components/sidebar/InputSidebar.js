@@ -243,26 +243,90 @@ export class InputSidebar {
         downpaymentAmountDisplay.readOnly = true;
         downpaymentAmountDisplay.style.backgroundColor = '#f8f9fa';
         downpaymentAmountDisplay.style.cursor = 'default';
+        
+        // Closing costs input
+        const closingCostsInput = new InputGroup(content, 'Closing Costs', 'number', '', '100');
+        
+        // Land Transfer Tax (auto-computed, read-only)
+        const landTransferTaxGroup = document.createElement('div');
+        landTransferTaxGroup.className = 'input-group';
+        const landTransferTaxLabel = document.createElement('label');
+        landTransferTaxLabel.textContent = 'Land Transfer Tax (Ontario)';
+        landTransferTaxLabel.className = 'input-label';
+        const landTransferTaxDisplay = document.createElement('input');
+        landTransferTaxDisplay.type = 'text';
+        landTransferTaxDisplay.className = 'input-field';
+        landTransferTaxDisplay.readOnly = true;
+        landTransferTaxDisplay.style.backgroundColor = '#f8f9fa';
+        landTransferTaxDisplay.style.cursor = 'default';
+        
+        // Function to calculate Ontario Land Transfer Tax
+        const calculateLandTransferTax = (purchasePrice) => {
+            if (!purchasePrice || purchasePrice <= 0) return 0;
+            let tax = 0;
+            const price = purchasePrice;
+            
+            // Ontario Land Transfer Tax rates:
+            // 0.5% on the first $55,000
+            // 1.0% on the portion between $55,000 and $250,000
+            // 1.5% on the portion between $250,000 and $400,000
+            // 2.0% on the portion over $400,000
+            
+            if (price > 400000) {
+                tax += (price - 400000) * 0.02;
+                tax += (400000 - 250000) * 0.015;
+                tax += (250000 - 55000) * 0.01;
+                tax += 55000 * 0.005;
+            } else if (price > 250000) {
+                tax += (price - 250000) * 0.015;
+                tax += (250000 - 55000) * 0.01;
+                tax += 55000 * 0.005;
+            } else if (price > 55000) {
+                tax += (price - 55000) * 0.01;
+                tax += 55000 * 0.005;
+            } else {
+                tax += price * 0.005;
+            }
+            
+            return tax;
+        };
+        
         const updateDownpaymentDisplay = () => {
-            const purchasePrice = purchasePriceInput.getValue();
+            const purchasePrice = purchasePriceInput.getValue() || 0;
             const downpaymentPercent = parseFloat(downpaymentInput.value) || 0;
             const downpaymentAmount = purchasePrice * (downpaymentPercent / 100);
             downpaymentAmountDisplay.value = `$${downpaymentAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         };
+        
+        const updateLandTransferTaxDisplay = () => {
+            const purchasePrice = purchasePriceInput.getValue() || 0;
+            const landTransferTax = calculateLandTransferTax(purchasePrice);
+            landTransferTaxDisplay.value = `$${landTransferTax.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        };
+        
         const saveAndUpdate = () => {
             updateDownpaymentDisplay();
+            updateLandTransferTaxDisplay();
             if (this.saveConfigurationCallback) {
                 this.saveConfigurationCallback();
             }
         };
+        
         purchasePriceInput.addEventListener('input', saveAndUpdate);
         purchasePriceInput.addEventListener('change', saveAndUpdate);
         downpaymentInput.addEventListener('input', saveAndUpdate);
         downpaymentInput.addEventListener('change', saveAndUpdate);
+        closingCostsInput.addEventListener('input', saveAndUpdate);
+        closingCostsInput.addEventListener('change', saveAndUpdate);
+        
         downpaymentGroup.appendChild(downpaymentLabel);
         downpaymentGroup.appendChild(downpaymentInput);
         downpaymentGroup.appendChild(downpaymentAmountLabel);
         downpaymentGroup.appendChild(downpaymentAmountDisplay);
+        
+        landTransferTaxGroup.appendChild(landTransferTaxLabel);
+        landTransferTaxGroup.appendChild(landTransferTaxDisplay);
+        
         // Store reference to downpayment input element for event handling
         const downpaymentWrapper = {
             getValue: () => parseFloat(downpaymentInput.value) || 0,
@@ -272,10 +336,26 @@ export class InputSidebar {
             },
             getInputElement: () => downpaymentInput
         };
+        
+        // Store reference to land transfer tax (read-only, computed)
+        const landTransferTaxWrapper = {
+            getValue: () => {
+                const purchasePrice = purchasePriceInput.getValue() || 0;
+                return calculateLandTransferTax(purchasePrice);
+            },
+            setValue: () => {}, // Read-only, no-op
+            addEventListener: () => {}, // Read-only, no listeners needed
+            getInputElement: () => landTransferTaxDisplay
+        };
+        
         this.inputGroups.set('purchase_price', purchasePriceInput);
         this.inputGroups.set('downpayment_percentage', downpaymentWrapper);
+        this.inputGroups.set('closing_costs', closingCostsInput);
+        this.inputGroups.set('land_transfer_tax', landTransferTaxWrapper);
         content.appendChild(downpaymentGroup);
+        content.appendChild(landTransferTaxGroup);
         updateDownpaymentDisplay(); // Initial display
+        updateLandTransferTaxDisplay(); // Initial display
     }
     createMortgageCategory() {
         const content = this.createCategory('Mortgage');
@@ -416,7 +496,7 @@ export class InputSidebar {
                         inputGroup.setValue(inputValues[key]);
                     }
                 });
-                // Trigger downpayment display update
+                // Trigger downpayment and land transfer tax display update
                 const purchasePriceInput = this.inputGroups.get('purchase_price');
                 const downpaymentInput = this.inputGroups.get('downpayment_percentage');
                 if (purchasePriceInput && downpaymentInput) {

@@ -58,6 +58,8 @@ def calculate_investment():
     {
         "purchase_price": float,
         "downpayment_percentage": float (as percentage, e.g., 20 for 20%),
+        "closing_costs": float,
+        "land_transfer_tax": float,
         "interest_rate": float (as percentage),
         "loan_years": int,
         "payment_type": str ("Principal and Interest" or "Interest Only"),
@@ -127,7 +129,9 @@ def calculate_investment():
             'marginal_tax_rate': 'Marginal Tax Rate',
             'expected_return_rate': 'Expected Return Rate',
             'real_estate_market_increase': 'Real Estate Market Increase',
-            'commission_percentage': 'Commission Percentage'
+            'commission_percentage': 'Commission Percentage',
+            'closing_costs': 'Closing Costs',
+            'land_transfer_tax': 'Land Transfer Tax'
         }
         
         for field, label in numeric_fields.items():
@@ -145,6 +149,10 @@ def calculate_investment():
         purchase_price = float(Decimal(str(data.get('purchase_price', 0))))
         downpayment_percentage = float(Decimal(str(data.get('downpayment_percentage', 20))) / Decimal('100'))
         downpayment = float(Decimal(str(purchase_price)) * Decimal(str(downpayment_percentage)))
+        closing_costs = float(Decimal(str(data.get('closing_costs', 0))))
+        land_transfer_tax = float(Decimal(str(data.get('land_transfer_tax', 0))))
+        # Total initial investment = downpayment + closing costs + land transfer tax
+        total_initial_investment = float(Decimal(str(downpayment)) + Decimal(str(closing_costs)) + Decimal(str(land_transfer_tax)))
         interest_rate = float(Decimal(str(data.get('interest_rate', 0))) / Decimal('100'))
         loan_years = int(data.get('loan_years', 30))
         maintenance_base = float(Decimal(str(data.get('maintenance_base', 0))))
@@ -183,7 +191,7 @@ def calculate_investment():
         # Initialize results
         results = []
         principal_remaining = loan_principal
-        cumulative_investment_old = downpayment  # Keep old calculation for expected return
+        cumulative_investment_old = total_initial_investment  # Keep old calculation for expected return
         cumulative_net_profit = 0.0  # Track cumulative net profit for new calculation
         cumulative_expected_return = 0.0  # Start at 0, will be sum of expected return values
         
@@ -198,8 +206,8 @@ def calculate_investment():
         sale_income_0 = calculate_sale_income(home_value_0, sales_fees_0, capital_gains_tax_0)
         sale_net_0 = calculate_sale_net(sale_income_0, loan_principal)
         # Use new calculation methods for month 0 (cumulative_net_profit is 0)
-        cumulative_investment_0 = calculate_cumulative_investment_new(downpayment, 0.0)
-        net_return_0 = calculate_net_return_new(sale_net_0, downpayment, 0.0)
+        cumulative_investment_0 = calculate_cumulative_investment_new(total_initial_investment, 0.0)
+        net_return_0 = calculate_net_return_new(sale_net_0, total_initial_investment, 0.0)
         return_percent_0 = calculate_return_percent(net_return_0, cumulative_investment_0)
         return_comparison_0 = calculate_return_comparison(0.0, net_return_0)  # cumulative_expected_return is 0.0 for month 0
         
@@ -274,7 +282,7 @@ def calculate_investment():
             # Calculate cumulative values for expected return (using old method)
             is_first_month = (month == 1)
             cumulative_investment_old = calculate_cumulative_investment(
-                cumulative_investment_old, net_profit, downpayment, is_first_month
+                cumulative_investment_old, net_profit, total_initial_investment, is_first_month
             )
             
             # Expected return is calculated monthly based on (cumulative investment + previous cumulative expected return) × return rate
@@ -298,8 +306,8 @@ def calculate_investment():
             sale_net = calculate_sale_net(sale_income, principal_remaining)
             
             # Use new calculation methods
-            cumulative_investment = calculate_cumulative_investment_new(downpayment, cumulative_net_profit)
-            net_return = calculate_net_return_new(sale_net, downpayment, cumulative_net_profit)
+            cumulative_investment = calculate_cumulative_investment_new(total_initial_investment, cumulative_net_profit)
+            net_return = calculate_net_return_new(sale_net, total_initial_investment, cumulative_net_profit)
             return_percent = calculate_return_percent(net_return, cumulative_investment)
             return_comparison = calculate_return_comparison(cumulative_expected_return, net_return)
             

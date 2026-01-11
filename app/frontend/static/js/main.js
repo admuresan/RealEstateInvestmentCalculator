@@ -260,11 +260,19 @@ class InvestmentCalculator {
         // Override handleAddTab to also create display tab
         const originalHandleAddTab = this.scenarioTabs.handleAddTab.bind(this.scenarioTabs);
         this.scenarioTabs.handleAddTab = async () => {
-            this.loadingOverlay.show('Adding scenario...', 'Setting up new scenario');
+            // Get the current scenario count before showing modal
+            const scenarioCountBefore = this.scenarioTabs.getScenarioCount();
+            
+            // Don't show loading overlay yet - wait for user to select an option from the modal
             await originalHandleAddTab();
-            // After tab is added, set up the new tab
-            const newTabIndex = this.scenarioTabs.getScenarioCount() - 1;
-            if (newTabIndex >= 0) {
+            
+            // Check if a new tab was actually created (user didn't cancel)
+            const scenarioCountAfter = this.scenarioTabs.getScenarioCount();
+            if (scenarioCountAfter > scenarioCountBefore) {
+                // A new tab was created, now show loading overlay and set it up
+                this.loadingOverlay.show('Adding scenario...', 'Setting up new scenario');
+                const newTabIndex = scenarioCountAfter - 1;
+                
                 // Add corresponding display tab
                 this.displayTabs.addTab(`Scenario ${newTabIndex + 1}`);
                 
@@ -277,26 +285,28 @@ class InvestmentCalculator {
                         displayTab.contentComponents.table.setInputGroups(tab.inputSidebar.getInputGroups());
                     }
                     
-                    // Set up input change listener - this will be triggered when values change
-                    // This ensures calculations run whenever inputs change
-                    tab.inputSidebar.addInputChangeListener(() => {
-                        // Save scenarios when inputs change
-                        this.scenarioTabs.saveScenarios();
-                        // Perform calculation for this scenario
-                        this.performCalculationForScenario(newTabIndex);
-                    });
-                    
-                    // Wait for values to be set and display tab to be fully initialized
-                    // Then ensure save and calculation happen (change events from setValue should trigger listeners)
+                    // Wait for values to be set in addTab before setting up listeners
+                    // This prevents calculations from being triggered during initial value setting
                     setTimeout(() => {
-                        // Force save again to make absolutely sure it's persisted
-                        this.scenarioTabs.saveScenarios();
-                        // Update cross-scenario chart with new scenario
-                        this.updateCrossScenarioChart();
-                        // Force calculation to ensure it runs (change events should have triggered it, but ensure it happens)
-                        // Wait a bit more to ensure display tab components are fully initialized
-                        setTimeout(() => {
+                        // Set up input change listener AFTER values are set
+                        // This ensures calculations only run when user makes changes, not during initial setup
+                        tab.inputSidebar.addInputChangeListener(() => {
+                            // Save scenarios when inputs change
+                            this.scenarioTabs.saveScenarios();
+                            // Perform calculation for this scenario
                             this.performCalculationForScenario(newTabIndex);
+                        });
+                        
+                        // Wait for values to be fully set and display tab to be fully initialized
+                        // Then trigger calculation now that setup is complete
+                        setTimeout(() => {
+                            // Force save to ensure values are persisted
+                            this.scenarioTabs.saveScenarios();
+                            // Update cross-scenario chart with new scenario
+                            this.updateCrossScenarioChart();
+                            // Now trigger calculation after everything is set up
+                            this.performCalculationForScenario(newTabIndex);
+                            this.loadingOverlay.hide();
                         }, 100);
                     }, 450);
                 } else {
@@ -305,6 +315,7 @@ class InvestmentCalculator {
                     this.loadingOverlay.hide();
                 }
             }
+            // If user cancelled, no new tab was created, so do nothing (no loading overlay was shown)
         };
     }
 
@@ -498,6 +509,8 @@ class InvestmentCalculator {
             const params = {
                 purchase_price: values.get('purchase_price'),
                 downpayment_percentage: values.get('downpayment_percentage'),
+                closing_costs: values.get('closing_costs') ?? 0,
+                land_transfer_tax: values.get('land_transfer_tax') ?? 0,
                 interest_rate: values.get('interest_rate'),
                 loan_years: values.get('loan_years'),
                 payment_type: values.get('payment_type') || 'Principal and Interest',
