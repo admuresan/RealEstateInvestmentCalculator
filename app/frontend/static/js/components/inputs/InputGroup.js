@@ -18,10 +18,23 @@ export class InputGroup {
         parent.appendChild(this.container);
     }
     getValue() {
-        return parseFloat(this.input.value) || 0;
+        const trimmedValue = String(this.input.value).trim();
+        if (trimmedValue === '') {
+            return null; // Return null for empty inputs to distinguish from 0
+        }
+        const numValue = parseFloat(trimmedValue);
+        return isNaN(numValue) ? null : numValue;
     }
     setValue(value) {
-        this.input.value = value.toString();
+        // Handle null/undefined by setting to empty string
+        if (value === null || value === undefined) {
+            this.input.value = '';
+        } else {
+            this.input.value = value.toString();
+        }
+        // Trigger change and input events so listeners are notified
+        this.input.dispatchEvent(new Event('change', { bubbles: true }));
+        this.input.dispatchEvent(new Event('input', { bubbles: true }));
     }
     addEventListener(event, handler) {
         this.input.addEventListener(event, handler);

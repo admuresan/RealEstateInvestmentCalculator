@@ -1,11 +1,15 @@
 /**
  * Validation banner component to display input validation errors.
  */
+import { ValidationErrorsModal } from './ValidationErrorsModal.js';
+
 export class ValidationBanner {
     constructor(parent) {
         this.container = document.createElement('div');
         this.container.className = 'validation-banner';
         this.container.style.display = 'none';
+        this.errorsModal = new ValidationErrorsModal();
+        this.allErrors = [];
         parent.appendChild(this.container);
     }
 
@@ -18,6 +22,9 @@ export class ValidationBanner {
             this.hide();
             return;
         }
+
+        // Store all errors
+        this.allErrors = errors;
 
         this.container.innerHTML = '';
         
@@ -36,13 +43,39 @@ export class ValidationBanner {
 
         const errorList = document.createElement('ul');
         errorList.className = 'validation-errors';
-        errors.forEach(error => {
+        
+        // Show only first 2 errors
+        const displayErrors = errors.slice(0, 2);
+        displayErrors.forEach(error => {
             const li = document.createElement('li');
             li.textContent = error;
             errorList.appendChild(li);
         });
-        content.appendChild(errorList);
 
+        // If there are more than 2 errors, add "..." link
+        if (errors.length > 2) {
+            const moreLink = document.createElement('li');
+            moreLink.className = 'validation-more-link';
+            moreLink.style.cssText = `
+                color: #856404;
+                cursor: pointer;
+                text-decoration: underline;
+                font-weight: 600;
+            `;
+            moreLink.textContent = `... and ${errors.length - 2} more (click to view all)`;
+            moreLink.addEventListener('click', () => {
+                this.errorsModal.show(this.allErrors);
+            });
+            moreLink.addEventListener('mouseenter', () => {
+                moreLink.style.color = '#664d03';
+            });
+            moreLink.addEventListener('mouseleave', () => {
+                moreLink.style.color = '#856404';
+            });
+            errorList.appendChild(moreLink);
+        }
+
+        content.appendChild(errorList);
         this.container.appendChild(content);
         this.container.style.display = 'flex';
     }
@@ -52,6 +85,7 @@ export class ValidationBanner {
      */
     hide() {
         this.container.style.display = 'none';
+        this.allErrors = [];
     }
 }
 

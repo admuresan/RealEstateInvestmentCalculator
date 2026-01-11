@@ -6,16 +6,24 @@ export class Sidebar {
     constructor(parent) {
         this.columnItems = new Map();
         this.wrapper = parent; // Store reference to wrapper
-        this.container = document.createElement('div');
-        this.container.className = 'sidebar';
         
-        // Create header (without button)
+        // Create column info container wrapper
+        this.columnInfoContainer = document.createElement('div');
+        this.columnInfoContainer.className = 'column-info-container';
+        parent.appendChild(this.columnInfoContainer);
+        
+        // Create header (without button) - above scrollable content
         this.createHeader();
+        
+        // Create scrollable content container
+        this.scrollableContent = document.createElement('div');
+        this.scrollableContent.className = 'sidebar-content-scrollable';
         
         this.content = document.createElement('div');
         this.content.className = 'sidebar-content';
-        this.container.appendChild(this.content);
-        parent.appendChild(this.container);
+        this.scrollableContent.appendChild(this.content);
+        
+        this.columnInfoContainer.appendChild(this.scrollableContent);
         
         // Display all column information
         this.showAllColumns();
@@ -38,7 +46,7 @@ export class Sidebar {
         title.className = 'sidebar-title';
         header.appendChild(title);
         
-        this.container.appendChild(header);
+        this.columnInfoContainer.appendChild(header);
     }
     createToggleButton() {
         // Create toggle button on the sidebar wrapper itself (not inside sidebar component)

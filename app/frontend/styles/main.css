@@ -10,8 +10,11 @@
 
 html, body {
     height: 100%;
+    width: 100%;
     margin: 0;
     padding: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
 }
 
 body {
@@ -21,6 +24,8 @@ body {
     line-height: 1.6;
     display: flex;
     flex-direction: column;
+    width: 100%;
+    min-height: 100vh;
 }
 
 .app-header {
@@ -45,12 +50,13 @@ body {
 }
 
 #app {
-    max-width: 100%;
-    margin: 0 auto;
+    width: 100%;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
     flex: 1;
     display: flex;
     flex-direction: column;
-    min-height: 0;
 }
 
 .main-content {
@@ -58,11 +64,10 @@ body {
     flex-direction: row;
     gap: 1rem;
     padding: 1rem;
-    max-width: 100%;
+    width: 100%;
     flex: 1;
-    min-height: 0;
-    align-items: stretch;
-    overflow: hidden;
+    min-height: calc(100vh - 200px);
+    align-items: flex-start;
 }
 
 .main-content-row {
@@ -80,10 +85,7 @@ body {
     flex-direction: column;
     gap: 1rem;
     min-width: 0;
-    min-height: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
-    height: 100%;
+    min-height: 400px;
     transition: flex 0.3s ease;
 }
 
@@ -134,7 +136,13 @@ body {
     flex-direction: column;
     overflow: hidden;
     height: 100%;
+    min-height: 400px;
     transition: width 0.3s ease, margin 0.3s ease;
+}
+
+.input-sidebar-wrapper > * {
+    flex: 1;
+    min-height: 0;
 }
 
 .input-sidebar-wrapper.collapsed {
@@ -195,6 +203,13 @@ body {
     min-height: 0;
     overflow-y: auto;
     height: 100%;
+}
+
+/* When input-sidebar is inside scenario tabs, adjust styling */
+.scenario-tab-content .input-sidebar {
+    box-shadow: none;
+    border-radius: 0;
+    padding: 1rem;
 }
 
 .input-category {
@@ -402,6 +417,7 @@ body {
     position: relative;
     z-index: 1;
     height: 100%;
+    min-height: 400px;
     transition: width 0.3s ease, margin 0.3s ease;
 }
 
@@ -417,8 +433,7 @@ body {
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     padding: 1rem;
-    position: sticky;
-    top: 0;
+    flex-shrink: 0;
     z-index: 5;
 }
 
@@ -902,21 +917,40 @@ body {
     margin-bottom: 1.5rem;
 }
 
+.column-info-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
 .sidebar-header {
     font-size: 1.5rem;
-    margin-bottom: 1rem;
+    margin: 0;
+    padding: 1rem;
     color: #667eea;
     border-bottom: 2px solid #667eea;
-    padding-bottom: 0.5rem;
-    position: relative;
+    flex-shrink: 0;
     background: white;
     z-index: 1;
+}
+
+.sidebar-content-scrollable {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 0;
 }
 
 .sidebar-content {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+    padding: 1rem;
 }
 
 .column-info-item {
@@ -1006,13 +1040,15 @@ body {
     .input-sidebar-wrapper {
         width: 100%;
         height: auto;
-        max-height: 400px;
+        min-height: 400px;
+        max-height: 600px;
     }
 
     .sidebar-wrapper {
         width: 100%;
         height: auto;
-        max-height: 400px;
+        min-height: 400px;
+        max-height: 600px;
     }
 
     .sidebar {
@@ -1095,5 +1131,266 @@ body {
     position: absolute;
     left: 0;
     font-weight: bold;
+}
+
+.validation-more-link {
+    list-style: none !important;
+}
+
+.validation-more-link::before {
+    content: none !important;
+}
+
+/* Validation Errors Modal Styles */
+.validation-errors-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 10002;
+    display: none;
+    justify-content: center;
+    align-items: center;
+}
+
+.validation-errors-modal {
+    background: white;
+    border-radius: 8px;
+    padding: 24px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    position: relative;
+}
+
+.validation-errors-modal-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    color: #856404;
+}
+
+.validation-errors-modal-list li {
+    padding: 8px 0;
+    padding-left: 24px;
+    position: relative;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.validation-errors-modal-list li:last-child {
+    border-bottom: none;
+}
+
+.validation-errors-modal-list li::before {
+    content: '•';
+    position: absolute;
+    left: 0;
+    font-weight: bold;
+    color: #856404;
+}
+
+/* Scenario Tabs Styles */
+.input-sidebar-wrapper > .scenario-tabs-container {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+}
+
+.scenario-tabs-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    flex: 1;
+    min-height: 400px;
+}
+
+.scenario-tabs-container .sidebar-toggle-header {
+    flex-shrink: 0;
+    margin-bottom: 0;
+    padding: 1rem 1rem 0.5rem 1rem;
+    border-bottom: 2px solid #e0e0e0;
+    background: white;
+}
+
+.scenario-tabs-header {
+    flex-shrink: 0;
+    border-bottom: 2px solid #e0e0e0;
+    padding: 0 8px;
+    background: #f8f9fa;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.scenario-tabs-list {
+    display: flex;
+    flex: 1;
+    gap: 4px;
+    overflow-x: auto;
+}
+
+.scenario-tab-button-container {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    position: relative;
+}
+
+.scenario-tab-delete-btn {
+    padding: 2px 6px;
+    border: none;
+    background: transparent;
+    color: #999;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    border-radius: 3px;
+    transition: all 0.2s ease;
+    opacity: 0.6;
+    flex-shrink: 0;
+}
+
+.scenario-tab-delete-btn:hover {
+    background-color: #fee;
+    color: #c33;
+    opacity: 1;
+}
+
+.scenario-tabs-content {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.scenario-tab-content {
+    height: 100%;
+    width: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: none;
+    flex-direction: column;
+}
+
+.scenario-tab-content[style*="display: flex"] {
+    display: flex !important;
+}
+
+.scenario-tab-content .input-sidebar-content-wrapper {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 0;
+}
+
+.scenario-tab-content .input-sidebar {
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    min-height: fit-content;
+}
+
+/* Display Tabs Styles */
+.display-tabs-wrapper {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+.display-tabs-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+}
+
+.display-tabs-content {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    min-height: 500px;
+    height: 100%;
+}
+
+.display-tab-content {
+    height: 100%;
+    width: 100%;
+    overflow-y: auto;
+    min-height: 400px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Scenario Performance Rows */
+.scenarios-performance-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.scenario-performance-row {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 1rem;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    border-left: 4px solid #667eea;
+}
+
+.scenario-number {
+    font-weight: 600;
+    color: #667eea;
+    font-size: 1rem;
+    min-width: 100px;
+    flex-shrink: 0;
+}
+
+.scenario-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    flex: 1;
+}
+
+/* Copy Scenario Modal Styles */
+.copy-scenario-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 10001;
+    display: none;
+    justify-content: center;
+    align-items: center;
+}
+
+.copy-scenario-modal {
+    background: white;
+    border-radius: 8px;
+    padding: 24px;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    position: relative;
 }
 

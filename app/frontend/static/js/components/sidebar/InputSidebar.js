@@ -3,15 +3,17 @@
  */
 import { InputGroup } from '../inputs/InputGroup.js';
 export class InputSidebar {
-    constructor(parent) {
+    constructor(parent, createHeader = true) {
         this.inputGroups = new Map();
         this.categories = new Map();
         this.wrapper = parent; // Store reference to wrapper
         this.container = document.createElement('div');
         this.container.className = 'input-sidebar';
         
-        // Create header with toggle button
-        this.createHeader();
+        // Create header with toggle button (unless disabled)
+        if (createHeader) {
+            this.createHeader();
+        }
         
         // Create categories
         this.createPurchaseCategory();
@@ -26,7 +28,9 @@ export class InputSidebar {
         // Load collapse states after DOM is ready
         requestAnimationFrame(() => {
             this.loadCollapseStates();
-            this.loadSidebarCollapseState();
+            if (createHeader) {
+                this.loadSidebarCollapseState();
+            }
         });
     }
     createHeader() {
@@ -387,18 +391,11 @@ export class InputSidebar {
         return isNaN(numValue);
     }
     saveConfiguration() {
-        try {
-            const inputValues = {};
-            this.inputGroups.forEach((inputGroup, key) => {
-                const value = inputGroup.getValue();
-                if (value !== undefined && !isNaN(value)) {
-                    inputValues[key] = value;
-                }
-            });
-            localStorage.setItem('calculator_inputs', JSON.stringify(inputValues));
-        }
-        catch (error) {
-            console.warn('Failed to save configuration:', error);
+        // This method is kept for backward compatibility
+        // Actual saving is now handled by ScenarioTabs.saveScenarios()
+        // But we still call the callback if it exists
+        if (this.saveConfigurationCallback) {
+            this.saveConfigurationCallback();
         }
     }
     loadConfiguration() {

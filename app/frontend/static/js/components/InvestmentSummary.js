@@ -4,7 +4,9 @@
 export class InvestmentSummary {
     constructor(container, performanceContainer) {
         this.container = container;
-        this.container.className = 'investment-summary';
+        if (this.container) {
+            this.container.className = 'investment-summary';
+        }
         this.performanceContainer = performanceContainer;
         
         // Create summary content structure
@@ -13,21 +15,27 @@ export class InvestmentSummary {
 
     createStructure() {
         // Clear any existing content
-        this.container.innerHTML = '';
+        if (this.container) {
+            this.container.innerHTML = '';
+        }
         if (this.performanceContainer) {
             this.performanceContainer.innerHTML = '';
         }
 
         // Title
-        const title = document.createElement('h3');
-        title.className = 'summary-title';
-        title.textContent = 'Investment Summary & Key Insights';
-        this.container.appendChild(title);
+        if (this.container) {
+            const title = document.createElement('h3');
+            title.className = 'summary-title';
+            title.textContent = 'Investment Summary & Key Insights';
+            this.container.appendChild(title);
 
-        // Summary content container
-        this.contentContainer = document.createElement('div');
-        this.contentContainer.className = 'summary-content';
-        this.container.appendChild(this.contentContainer);
+            // Summary content container
+            this.contentContainer = document.createElement('div');
+            this.contentContainer.className = 'summary-content';
+            this.container.appendChild(this.contentContainer);
+        } else {
+            this.contentContainer = null;
+        }
 
         // Performance content container (at top)
         if (this.performanceContainer) {
@@ -41,13 +49,15 @@ export class InvestmentSummary {
     }
 
     showPlaceholder() {
-        this.contentContainer.innerHTML = '<p class="summary-placeholder">Complete the form and run calculations to see investment insights.</p>';
+        if (this.contentContainer) {
+            this.contentContainer.innerHTML = '<p class="summary-placeholder">Complete the form and run calculations to see investment insights.</p>';
+        }
         if (this.performanceContent) {
             this.performanceContent.innerHTML = '';
         }
     }
 
-    updateSummary(results, inputValues) {
+    updateSummary(results, inputValues, scenarioNumber = null) {
         if (!results || results.length === 0) {
             this.showPlaceholder();
             return;
@@ -90,6 +100,8 @@ export class InvestmentSummary {
         const expectedReturnPercent = totalInvestment > 0 ? ((expectedReturnNet / totalInvestment) * 100) : 0;
         
         // Build Overall Performance HTML (for top container)
+        // If scenarioNumber is provided, this is a single scenario row
+        // Otherwise, it's the full performance section
         const performanceHTML = `
             <div class="summary-section">
                 <h4 class="summary-section-title">📊 Overall Performance</h4>
@@ -151,7 +163,93 @@ export class InvestmentSummary {
         if (this.performanceContent) {
             this.performanceContent.innerHTML = performanceHTML;
         }
-        this.contentContainer.innerHTML = summaryHTML;
+        if (this.contentContainer) {
+            this.contentContainer.innerHTML = summaryHTML;
+        }
+    }
+
+    /**
+     * Update performance section with multiple scenario rows
+     */
+    updateMultipleScenarios(scenariosData) {
+        if (!this.performanceContent) return;
+        
+        if (!scenariosData || scenariosData.length === 0) {
+            this.performanceContent.innerHTML = '';
+            return;
+        }
+
+        // Build performance rows for each scenario
+        const rowsHTML = scenariosData.map((scenario, index) => {
+            const { results, inputValues } = scenario;
+            if (!results || results.length === 0) return '';
+            
+            const finalResult = results[results.length - 1];
+            const purchasePrice = inputValues.get('purchase_price') || 0;
+            const downpaymentPercent = inputValues.get('downpayment_percentage') || 0;
+            const downpayment = purchasePrice * (downpaymentPercent / 100);
+            
+            let totalInvestment = downpayment;
+            results.forEach(result => {
+                if (result.net_profit < 0) {
+                    totalInvestment += Math.abs(result.net_profit);
+                }
+            });
+            
+            const saleGross = finalResult.sale_gross || 0;
+            const saleNet = saleGross - totalInvestment;
+            const totalReturn = saleNet;
+            const returnPercent = totalInvestment > 0 ? (totalReturn / totalInvestment) * 100 : 0;
+            const returnComparison = finalResult.return_comparison || 0;
+            const cumulativeExpectedReturn = finalResult.cumulative_expected_return || 0;
+            
+            return `
+                <div class="scenario-performance-row">
+                    <div class="scenario-number">Scenario ${index + 1}</div>
+                    <div class="scenario-metrics">
+                        <div class="summary-metric">
+                            <span class="metric-label">Total Return:</span>
+                            <span class="metric-value ${totalReturn >= 0 ? 'positive' : 'negative'}">
+                                ${this.formatCurrency(totalReturn)}
+                            </span>
+                        </div>
+                        <div class="summary-metric">
+                            <span class="metric-label">Return %:</span>
+                            <span class="metric-value ${returnPercent >= 0 ? 'positive' : 'negative'}">
+                                ${returnPercent.toFixed(2)}%
+                            </span>
+                        </div>
+                        <div class="summary-metric">
+                            <span class="metric-label">Expected Return:</span>
+                            <span class="metric-value ${cumulativeExpectedReturn >= 0 ? 'positive' : 'negative'}">
+                                ${this.formatCurrency(cumulativeExpectedReturn)}
+                            </span>
+                        </div>
+                        <div class="summary-metric">
+                            <span class="metric-label">Comparison:</span>
+                            <span class="metric-value ${returnComparison < 1 ? 'negative' : returnComparison > 1 ? 'positive' : ''}">
+                                ${returnComparison.toFixed(4)}x
+                            </span>
+                        </div>
+                        <div class="summary-metric">
+                            <span class="metric-label">Total Investment:</span>
+                            <span class="metric-value">${this.formatCurrency(totalInvestment)}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        const performanceHTML = `
+            <div class="summary-section">
+                <h4 class="summary-section-title">📊 Overall Performance</h4>
+                <div class="scenarios-performance-container">
+                    ${rowsHTML}
+                </div>
+            </div>
+        `;
+
+        this.performanceContent.innerHTML = performanceHTML;
     }
 
     generateInsights(finalResult, totalReturn, returnPercent, returnComparison, expectedReturnRate, cumulativeExpectedReturn, homeValue, purchasePrice, numYears, downpayment) {

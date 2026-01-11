@@ -28,7 +28,7 @@ export class InvestmentChart {
     }
     initializeChart() {
         // Check if Chart is available (loaded from CDN)
-        if (typeof Chart === 'undefined') {
+        if (typeof window.Chart === 'undefined' && typeof Chart === 'undefined') {
             console.warn('Chart.js not loaded. Loading from CDN...');
             this.loadChartJS().then(() => {
                 this.createChart();
@@ -40,7 +40,7 @@ export class InvestmentChart {
     }
     loadChartJS() {
         return new Promise((resolve, reject) => {
-            if (typeof Chart !== 'undefined') {
+            if (typeof window.Chart !== 'undefined' || typeof Chart !== 'undefined') {
                 resolve();
                 return;
             }
@@ -52,7 +52,8 @@ export class InvestmentChart {
         });
     }
     createChart() {
-        if (typeof Chart === 'undefined') {
+        const ChartLib = window.Chart || Chart;
+        if (typeof ChartLib === 'undefined') {
             console.error('Chart.js not available');
             return;
         }
@@ -65,7 +66,7 @@ export class InvestmentChart {
         if (this.chart) {
             this.chart.destroy();
         }
-        this.chart = new Chart(ctx, {
+        this.chart = new ChartLib(ctx, {
             type: 'line',
             data: {
                 labels: this.chartData.labels,

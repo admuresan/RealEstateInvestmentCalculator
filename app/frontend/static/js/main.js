@@ -3,113 +3,307 @@
  */
 import { Table } from './components/table/Table.js';
 import { Sidebar } from './components/sidebar/Sidebar.js';
-import { InputSidebar } from './components/sidebar/InputSidebar.js';
 import { ColumnVisibility } from './components/table/ColumnVisibility.js';
 import { InvestmentChart } from './components/chart/InvestmentChart.js';
 import { ReturnComparisonChart } from './components/chart/ReturnComparisonChart.js';
 import { NetProfitRentalIncomeChart } from './components/chart/NetProfitRentalIncomeChart.js';
 import { ValidationBanner } from './components/ValidationBanner.js';
 import { InvestmentSummary } from './components/InvestmentSummary.js';
+import { ScenarioTabs } from './components/scenario/ScenarioTabs.js';
+import { DisplayTabs } from './components/scenario/DisplayTabs.js';
 import { calculateInvestment } from './utils/api.js';
+
 class InvestmentCalculator {
     constructor() {
         this.numYears = 30;
+        this.scenarioData = new Map(); // Map of scenario index to { results, inputValues }
+        
         const appContainer = document.getElementById('app');
         if (!appContainer) {
             throw new Error('App container not found');
         }
+        
         // Create validation banner container (before main content)
         const bannerContainer = document.createElement('div');
         bannerContainer.className = 'validation-banner-container';
         appContainer.appendChild(bannerContainer);
+        
         // Create main layout - sidebars full height, chart and table in middle
         const mainContent = document.createElement('div');
         mainContent.className = 'main-content';
+        
         // Create input sidebar container (left side - full height)
         const inputSidebarContainer = document.createElement('div');
         inputSidebarContainer.className = 'input-sidebar-wrapper';
         mainContent.appendChild(inputSidebarContainer);
+        
         // Create middle content area (charts + table)
         const middleContent = document.createElement('div');
         middleContent.className = 'middle-content-wrapper';
+        
         // Create overall performance container (at top)
         const performanceContainer = document.createElement('div');
         performanceContainer.className = 'performance-wrapper';
         middleContent.appendChild(performanceContainer);
-        // Create charts container (2x2 grid)
-        const chartsContainer = document.createElement('div');
-        chartsContainer.className = 'charts-container';
-        // Create first chart container (Investment Overview)
-        const chartContainer = document.createElement('div');
-        chartContainer.className = 'chart-wrapper';
-        chartsContainer.appendChild(chartContainer);
-        // Create second chart container (Return Comparison)
-        const returnChartContainer = document.createElement('div');
-        returnChartContainer.className = 'chart-wrapper';
-        chartsContainer.appendChild(returnChartContainer);
-        // Create third chart container (Net Profit vs Rental Income)
-        const netProfitRentalChartContainer = document.createElement('div');
-        netProfitRentalChartContainer.className = 'chart-wrapper';
-        chartsContainer.appendChild(netProfitRentalChartContainer);
-        middleContent.appendChild(chartsContainer);
-        // Create table container (in middle area)
-        const tableContainer = document.createElement('div');
-        tableContainer.className = 'table-wrapper';
-        middleContent.appendChild(tableContainer);
-        // Create summary container (below table)
-        const summaryContainer = document.createElement('div');
-        summaryContainer.className = 'summary-wrapper';
-        middleContent.appendChild(summaryContainer);
+        
+        // Create display tabs container for charts, table, and insights
+        const displayTabsContainer = document.createElement('div');
+        displayTabsContainer.className = 'display-tabs-wrapper';
+        displayTabsContainer.style.cssText = `
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        `;
+        middleContent.appendChild(displayTabsContainer);
+        
         mainContent.appendChild(middleContent);
+        
         // Create info sidebar container (right side - full height)
         const sidebarContainer = document.createElement('div');
         sidebarContainer.className = 'sidebar-wrapper';
         mainContent.appendChild(sidebarContainer);
+        
         appContainer.appendChild(mainContent);
+        
         // Initialize components
         this.validationBanner = new ValidationBanner(bannerContainer);
-        this.chart = new InvestmentChart(chartContainer);
-        this.returnChart = new ReturnComparisonChart(returnChartContainer);
-        this.netProfitRentalChart = new NetProfitRentalIncomeChart(netProfitRentalChartContainer);
-        this.inputSidebar = new InputSidebar(inputSidebarContainer);
-        this.table = new Table(tableContainer);
-        this.table.setInputGroups(this.inputSidebar.getInputGroups());
-        this.summary = new InvestmentSummary(summaryContainer, performanceContainer);
+        
+        // Initialize scenario tabs for input sidebar
+        this.scenarioTabs = new ScenarioTabs(inputSidebarContainer);
+        this.scenarioTabs.setOnScenarioChange((index) => {
+            this.handleScenarioChange(index);
+        });
+        this.scenarioTabs.setOnScenariosLoaded(() => {
+            this.initializeDisplayTabs();
+            // Set up input change listeners for all loaded scenarios
+            this.setupInputChangeListeners();
+        });
+        this.scenarioTabs.setOnScenarioDeleted((deletedIndex) => {
+            this.handleScenarioDeleted(deletedIndex);
+        });
+        
+        // Initialize display tabs
+        this.displayTabs = new DisplayTabs(displayTabsContainer, (container, tabIndex) => {
+            return this.createDisplayTabContent(container, tabIndex);
+        });
+        
+        // Initialize summary for performance section (shared across all scenarios)
+        this.summary = new InvestmentSummary(null, performanceContainer);
+        
+        // Initialize sidebar
         this.sidebar = new Sidebar(sidebarContainer);
-        // Add column visibility control to sidebar
-        const visibilityContainer = document.createElement('div');
-        visibilityContainer.className = 'visibility-container';
-        sidebarContainer.insertBefore(visibilityContainer, sidebarContainer.firstChild);
-        this.columnVisibility = new ColumnVisibility(visibilityContainer, this.table.getColumns(), (visibleColumns) => {
-            this.table.setColumnVisibility(visibleColumns);
-        });
-        // Set up callback so header icon clicks update checkboxes
-        this.table.setVisibilityChangeCallback((visibleColumns) => {
-            this.columnVisibility.setColumnVisibility(visibleColumns);
-        });
-        // Set up save callback for input sidebar
-        this.inputSidebar.setSaveConfigurationCallback(() => {
-            // Save is handled by InputSidebar.saveConfiguration()
-        });
-        // Load saved configuration (after callbacks are set up)
-        this.inputSidebar.loadConfiguration();
-        this.table.loadConfiguration();
+        
         // Set up event listeners
         this.setupEventListeners();
-        // Initial calculation
-        this.performCalculation();
-    }
-    setupEventListeners() {
-        // Listen for input changes
-        this.inputSidebar.addInputChangeListener(() => {
-            this.performCalculation();
+        
+        // Wait for scenarios to load, then create display tabs
+        requestAnimationFrame(() => {
+            setTimeout(() => {
+                this.initializeDisplayTabs();
+                // Initial calculation for all scenarios
+                this.performCalculationForAllScenarios();
+            }, 200);
         });
     }
-    /**
-     * Validate all input values and return array of error messages.
-     * @returns {Array<string>} Array of validation error messages
-     */
-    validateInputs(values) {
+
+    initializeDisplayTabs() {
+        // Create display tabs for all loaded scenarios
+        const scenarioCount = this.scenarioTabs.getScenarioCount();
+        for (let i = 0; i < scenarioCount; i++) {
+            // Check if display tab already exists
+            const existingTab = this.displayTabs.getTab(i);
+            if (!existingTab) {
+                this.displayTabs.addTab(`Scenario ${i + 1}`);
+            }
+        }
+    }
+
+    createDisplayTabContent(container, tabIndex) {
+        // Create charts container (2x2 grid)
+        const chartsContainer = document.createElement('div');
+        chartsContainer.className = 'charts-container';
+        
+        // Create first chart container (Investment Overview)
+        const chartContainer = document.createElement('div');
+        chartContainer.className = 'chart-wrapper';
+        chartsContainer.appendChild(chartContainer);
+        
+        // Create second chart container (Return Comparison)
+        const returnChartContainer = document.createElement('div');
+        returnChartContainer.className = 'chart-wrapper';
+        chartsContainer.appendChild(returnChartContainer);
+        
+        // Create third chart container (Net Profit vs Rental Income)
+        const netProfitRentalChartContainer = document.createElement('div');
+        netProfitRentalChartContainer.className = 'chart-wrapper';
+        chartsContainer.appendChild(netProfitRentalChartContainer);
+        
+        container.appendChild(chartsContainer);
+        
+        // Create table container
+        const tableContainer = document.createElement('div');
+        tableContainer.className = 'table-wrapper';
+        container.appendChild(tableContainer);
+        
+        // Create summary container
+        const summaryContainer = document.createElement('div');
+        summaryContainer.className = 'summary-wrapper';
+        container.appendChild(summaryContainer);
+        
+        // Initialize components for this tab
+        const chart = new InvestmentChart(chartContainer);
+        const returnChart = new ReturnComparisonChart(returnChartContainer);
+        const netProfitRentalChart = new NetProfitRentalIncomeChart(netProfitRentalChartContainer);
+        const table = new Table(tableContainer);
+        
+        // Get input sidebar for this scenario to set up table
+        // Use setTimeout to ensure scenario tab is created first
+        setTimeout(() => {
+            const inputSidebar = this.scenarioTabs.getTab(tabIndex)?.inputSidebar;
+            if (inputSidebar) {
+                table.setInputGroups(inputSidebar.getInputGroups());
+            }
+        }, 0);
+        
+        const summary = new InvestmentSummary(summaryContainer, null);
+        
+        // Add column visibility control to sidebar (only for first tab)
+        if (tabIndex === 0) {
+            const visibilityContainer = document.createElement('div');
+            visibilityContainer.className = 'visibility-container';
+            // Insert into sidebar wrapper before the column info container
+            this.sidebar.wrapper.insertBefore(visibilityContainer, this.sidebar.columnInfoContainer);
+            this.columnVisibility = new ColumnVisibility(visibilityContainer, table.getColumns(), (visibleColumns) => {
+                // Update visibility for all tables
+                this.displayTabs.tabs.forEach(tab => {
+                    if (tab.contentComponents && tab.contentComponents.table) {
+                        tab.contentComponents.table.setColumnVisibility(visibleColumns);
+                    }
+                });
+            });
+            
+            // Set up callback so header icon clicks update checkboxes
+            table.setVisibilityChangeCallback((visibleColumns) => {
+                if (this.columnVisibility) {
+                    this.columnVisibility.setColumnVisibility(visibleColumns);
+                }
+            });
+        }
+        
+        return {
+            chart,
+            returnChart,
+            netProfitRentalChart,
+            table,
+            summary,
+            inputValues: null,
+            data: null
+        };
+    }
+
+    setupInputChangeListeners() {
+        // Listen for input changes in all scenario tabs
+        this.scenarioTabs.getAllInputSidebars().forEach((inputSidebar, index) => {
+            inputSidebar.addInputChangeListener(() => {
+                // Save scenarios when inputs change
+                this.scenarioTabs.saveScenarios();
+                this.performCalculationForScenario(index);
+            });
+        });
+    }
+
+    setupEventListeners() {
+        // Set up input change listeners for all scenario tabs
+        this.setupInputChangeListeners();
+        
+        // Override handleAddTab to also create display tab
+        const originalHandleAddTab = this.scenarioTabs.handleAddTab.bind(this.scenarioTabs);
+        this.scenarioTabs.handleAddTab = async () => {
+            await originalHandleAddTab();
+            // After tab is added, set up the new tab
+            const newTabIndex = this.scenarioTabs.getScenarioCount() - 1;
+            if (newTabIndex >= 0) {
+                // Add corresponding display tab
+                this.displayTabs.addTab(`Scenario ${newTabIndex + 1}`);
+                
+                // Set up input change listener for new tab
+                const tab = this.scenarioTabs.getTab(newTabIndex);
+                const displayTab = this.displayTabs.getTab(newTabIndex);
+                if (tab && displayTab && displayTab.contentComponents) {
+                    // Set up table input groups
+                    if (displayTab.contentComponents.table) {
+                        displayTab.contentComponents.table.setInputGroups(tab.inputSidebar.getInputGroups());
+                    }
+                    
+                    // Set up input change listener - this will be triggered when values change
+                    // This ensures calculations run whenever inputs change
+                    tab.inputSidebar.addInputChangeListener(() => {
+                        // Save scenarios when inputs change
+                        this.scenarioTabs.saveScenarios();
+                        // Perform calculation for this scenario
+                        this.performCalculationForScenario(newTabIndex);
+                    });
+                    
+                    // Wait for values to be set and display tab to be fully initialized
+                    // Then ensure save and calculation happen (change events from setValue should trigger listeners)
+                    setTimeout(() => {
+                        // Force save again to make absolutely sure it's persisted
+                        this.scenarioTabs.saveScenarios();
+                        // Force calculation to ensure it runs (change events should have triggered it, but ensure it happens)
+                        // Wait a bit more to ensure display tab components are fully initialized
+                        setTimeout(() => {
+                            this.performCalculationForScenario(newTabIndex);
+                        }, 100);
+                    }, 450);
+                }
+            }
+        };
+    }
+
+    handleScenarioChange(index) {
+        // Don't switch display tabs - keep them independent
+        // Only validate the newly active scenario and show/hide validation banner
+        this.validateAndShowBannerForScenario(index);
+    }
+
+    validateAndShowBannerForScenario(scenarioIndex) {
+        const tab = this.scenarioTabs.getTab(scenarioIndex);
+        if (!tab) return;
+        
+        const inputSidebar = tab.inputSidebar;
+        const values = inputSidebar.getInputValues();
+        const validationErrors = this.validateInputs(values, inputSidebar);
+        
+        if (validationErrors.length > 0) {
+            this.validationBanner.show(validationErrors);
+        } else {
+            this.validationBanner.hide();
+        }
+    }
+
+    handleScenarioDeleted(deletedIndex) {
+        // Remove corresponding display tab
+        this.displayTabs.removeTab(deletedIndex);
+        
+        // Remove scenario data from map
+        // Need to shift all indices after deleted one
+        const newScenarioData = new Map();
+        this.scenarioData.forEach((data, oldIndex) => {
+            if (oldIndex < deletedIndex) {
+                newScenarioData.set(oldIndex, data);
+            } else if (oldIndex > deletedIndex) {
+                newScenarioData.set(oldIndex - 1, data);
+            }
+            // Skip the deleted index
+        });
+        this.scenarioData = newScenarioData;
+        
+        // Recalculate all remaining scenarios
+        this.performCalculationForAllScenarios();
+    }
+
+    validateInputs(values, inputSidebar) {
         const errors = [];
         const fieldLabels = {
             purchase_price: 'Purchase Price',
@@ -132,31 +326,33 @@ class InvestmentCalculator {
         };
 
         // Check each required field for empty or invalid values
+        // Note: 0 is a valid value for many fields (like maintenance_base, utilities, etc.)
         for (const [key, label] of Object.entries(fieldLabels)) {
-            // Check both isInputEmpty and if value exists in values map
             const value = values.get(key);
-            if (this.inputSidebar.isInputEmpty(key) || value === undefined || value === null || (typeof value === 'number' && isNaN(value))) {
+            // Only flag as error if the value is null, undefined, or NaN
+            // 0 is a valid value and should not be flagged
+            if (value === undefined || value === null || (typeof value === 'number' && isNaN(value))) {
                 errors.push(`${label} is required`);
             }
         }
 
         // Additional validation for specific fields (only if not empty)
         const downpaymentPercent = values.get('downpayment_percentage');
-        if (!this.inputSidebar.isInputEmpty('downpayment_percentage')) {
+        if (!inputSidebar.isInputEmpty('downpayment_percentage')) {
             if (downpaymentPercent < 0 || downpaymentPercent > 100) {
                 errors.push('Downpayment Percentage must be between 0 and 100');
             }
         }
 
         const loanYears = values.get('loan_years');
-        if (!this.inputSidebar.isInputEmpty('loan_years')) {
+        if (!inputSidebar.isInputEmpty('loan_years')) {
             if (loanYears <= 0 || !Number.isInteger(loanYears)) {
                 errors.push('Loan Years must be a positive integer');
             }
         }
 
         const purchasePrice = values.get('purchase_price');
-        if (!this.inputSidebar.isInputEmpty('purchase_price')) {
+        if (!inputSidebar.isInputEmpty('purchase_price')) {
             if (purchasePrice <= 0) {
                 errors.push('Purchase Price must be greater than 0');
             }
@@ -165,23 +361,43 @@ class InvestmentCalculator {
         return errors;
     }
 
-    async performCalculation() {
-        const values = this.inputSidebar.getInputValues();
-        const validationErrors = this.validateInputs(values);
+    async performCalculationForScenario(scenarioIndex) {
+        const tab = this.scenarioTabs.getTab(scenarioIndex);
+        if (!tab) return;
+        
+        const inputSidebar = tab.inputSidebar;
+        const values = inputSidebar.getInputValues();
+        const validationErrors = this.validateInputs(values, inputSidebar);
 
-        if (validationErrors.length > 0) {
-            this.validationBanner.show(validationErrors);
-            // Clear table and charts when validation fails
-            this.table.updateData([]);
-            this.chart.updateData([]);
-            this.returnChart.updateData([]);
-            this.netProfitRentalChart.updateData([]);
-            this.summary.updateSummary([], values);
+        const displayTab = this.displayTabs.getTab(scenarioIndex);
+        if (!displayTab) {
+            console.warn(`Display tab ${scenarioIndex} not found, skipping calculation`);
+            return;
+        }
+        
+        // Ensure display tab content components are initialized
+        if (!displayTab.contentComponents) {
+            console.warn(`Display tab ${scenarioIndex} content components not initialized, skipping calculation`);
             return;
         }
 
-        // Hide banner if validation passes
-        this.validationBanner.hide();
+        if (validationErrors.length > 0) {
+            // Show validation errors only for active scenario
+            if (scenarioIndex === this.scenarioTabs.activeTabIndex) {
+                this.validationBanner.show(validationErrors);
+            }
+            
+            // Don't clear or update display tabs for invalid scenarios - leave them as is
+            // Only remove from scenarioData so it doesn't appear in performance section
+            this.scenarioData.delete(scenarioIndex);
+            this.updatePerformanceSection();
+            return;
+        }
+
+        // Hide banner if validation passes (only if this is the active scenario)
+        if (scenarioIndex === this.scenarioTabs.activeTabIndex) {
+            this.validationBanner.hide();
+        }
 
         try {
             const params = {
@@ -204,24 +420,49 @@ class InvestmentCalculator {
                 commission_percentage: values.get('commission_percentage'),
                 num_years: this.numYears
             };
+            
             const response = await calculateInvestment(params);
-            this.table.updateData(response.results);
-            this.chart.updateData(response.results);
-            this.returnChart.updateData(response.results);
-            this.netProfitRentalChart.updateData(response.results);
-            this.summary.updateSummary(response.results, values);
+            
+            // Store scenario data
+            this.scenarioData.set(scenarioIndex, {
+                results: response.results,
+                inputValues: values
+            });
+            
+            // Update display tab
+            this.displayTabs.updateTabData(scenarioIndex, response.results);
+            this.displayTabs.setInputValuesForTab(scenarioIndex, values);
+            
+            // Always ensure the active display tab renders, even if it's not this scenario
+            // This ensures content is visible when data arrives
+            const activeTabIndex = this.displayTabs.activeTabIndex;
+            if (scenarioIndex === activeTabIndex) {
+                requestAnimationFrame(() => {
+                    setTimeout(() => {
+                        this.displayTabs.renderTabContent(scenarioIndex);
+                    }, 150);
+                });
+            }
+            
+            // Also ensure the tab content is visible if it's the active tab
+            const displayTab = this.displayTabs.getTab(activeTabIndex);
+            if (displayTab && displayTab.content) {
+                if (displayTab.content.style.display === 'none') {
+                    displayTab.content.style.display = 'flex';
+                }
+            }
+            
+            // Update performance section (shows all scenarios)
+            this.updatePerformanceSection();
         }
         catch (error) {
             console.error('Calculation error:', error);
             const errorMessages = [];
             
-            // First, check if backend returned specific errors array
             if (error.errors && Array.isArray(error.errors)) {
                 errorMessages.push(...error.errors);
             }
-            // Otherwise, extract from error message
             else if (error.message) {
-                // Check if it's a validation error with multiple messages
                 if (error.message.includes(',')) {
                     errorMessages.push(...error.message.split(',').map(msg => msg.trim()).filter(msg => msg));
                 } else {
@@ -229,7 +470,6 @@ class InvestmentCalculator {
                 }
             }
             
-            // If no specific error message, provide helpful default messages
             if (errorMessages.length === 0) {
                 if (error.status === 400) {
                     errorMessages.push('Invalid input values. Please check that all fields contain valid numbers.');
@@ -240,13 +480,48 @@ class InvestmentCalculator {
                 }
             }
             
-            // Remove duplicates
             const uniqueErrors = [...new Set(errorMessages.filter(msg => msg && msg.trim()))];
             
-            this.validationBanner.show(uniqueErrors.length > 0 ? uniqueErrors : ['An unknown error occurred. Please check your inputs.']);
+            if (scenarioIndex === this.scenarioTabs.activeTabIndex) {
+                this.validationBanner.show(uniqueErrors.length > 0 ? uniqueErrors : ['An unknown error occurred. Please check your inputs.']);
+            }
         }
     }
+
+    async performCalculationForAllScenarios() {
+        const scenarioCount = this.scenarioTabs.getScenarioCount();
+        
+        // Ensure display tabs match scenario tabs
+        this.displayTabs.updateTabCount(scenarioCount);
+        
+        // Perform calculation for each scenario
+        for (let i = 0; i < scenarioCount; i++) {
+            await this.performCalculationForScenario(i);
+        }
+        
+        // Ensure validation banner is shown/hidden correctly for active scenario
+        this.validateAndShowBannerForScenario(this.scenarioTabs.activeTabIndex);
+    }
+
+    updatePerformanceSection() {
+        // Collect all scenario data
+        const scenariosData = [];
+        for (let i = 0; i < this.scenarioTabs.getScenarioCount(); i++) {
+            const data = this.scenarioData.get(i);
+            if (data) {
+                scenariosData.push(data);
+            }
+        }
+        
+        // Update performance section with all scenarios
+        this.summary.updateMultipleScenarios(scenariosData);
+    }
+
+    getTab(scenarioIndex) {
+        return this.scenarioTabs.getTab(scenarioIndex);
+    }
 }
+
 // Initialize app when DOM is ready
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
