@@ -99,17 +99,11 @@ export class InvestmentSummary {
         const expectedReturnNet = cumulativeExpectedReturn - totalInvestment;
         const expectedReturnPercent = totalInvestment > 0 ? ((expectedReturnNet / totalInvestment) * 100) : 0;
         
-        // Calculate net profit summary for the last year (sum of all 12 months of the last year)
-        // This is the summary row value for the last year
-        const lastYearStartMonth = (numYears - 1) * 12;
-        const lastYearEndMonth = Math.min(numYears * 12 - 1, results.length - 1);
+        // Calculate net profit summary (sum of all net profits across all months)
         let netProfitSummary = 0;
-        for (let month = lastYearStartMonth; month <= lastYearEndMonth; month++) {
-            const monthResult = results.find(r => r.month === month);
-            if (monthResult) {
-                netProfitSummary += (monthResult.net_profit || 0);
-            }
-        }
+        results.forEach(result => {
+            netProfitSummary += (result.net_profit || 0);
+        });
         
         // Build Overall Performance HTML (for top container)
         // If scenarioNumber is provided, this is a single scenario row
@@ -121,6 +115,10 @@ export class InvestmentSummary {
                     <div class="summary-metric">
                         <span class="metric-label">Total Investment:</span>
                         <span class="metric-value">${this.formatCurrency(totalInvestment)}</span>
+                    </div>
+                    <div class="summary-metric">
+                        <span class="metric-label">Home Sale Price:</span>
+                        <span class="metric-value">${this.formatCurrency(homeValue)}</span>
                     </div>
                     <div class="summary-metric">
                         <span class="metric-label">Net Profit:</span>
@@ -172,7 +170,7 @@ export class InvestmentSummary {
                     <li><strong>Tax Implications:</strong> Tax calculations are estimates based on your marginal tax rate. Consult a tax professional for accurate tax planning.</li>
                     <li><strong>Liquidity:</strong> Real estate is an illiquid investment. Consider your need for accessible funds before committing capital.</li>
                     <li><strong>Risk Factors:</strong> Property values can decline, tenants may default, and unexpected repairs can significantly impact returns.</li>
-                    <li><strong>Alternative Investments:</strong> Compare this return (${returnPercent.toFixed(2)}%) against your expected return rate (${(expectedReturnRate * 100).toFixed(2)}%) for alternative investments to make an informed decision.</li>
+                    <li><strong>Alternative Investments:</strong> Compare this return (${returnPercent.toFixed(2)}%) against your expected return rate (${(expectedReturnRate).toFixed(2)}%) for alternative investments to make an informed decision.</li>
                 </ul>
             </div>
         `;
@@ -220,6 +218,7 @@ export class InvestmentSummary {
         const returnPercent = totalInvestment > 0 ? (totalReturn / totalInvestment) * 100 : 0;
         const returnComparison = yearResult.return_comparison || 0;
         const cumulativeExpectedReturn = yearResult.cumulative_expected_return || 0;
+        const homeValue = yearResult.home_value || purchasePrice;
         
         // Calculate net profit summary for this year (sum of all 12 months in that year)
         // This is the summary row value - sum net_profit for months in this year
@@ -241,7 +240,8 @@ export class InvestmentSummary {
             cumulativeExpectedReturn,
             returnComparison,
             totalInvestment,
-            netProfit: netProfitSummary
+            netProfit: netProfitSummary,
+            homeValue: homeValue
         };
     }
 
@@ -279,6 +279,7 @@ export class InvestmentSummary {
                     <tr>
                         <th>Year</th>
                         <th>Total Investment</th>
+                        <th>Home Sale Price</th>
                         <th>Net Profit</th>
                         <th>Return if Sold</th>
                         <th>Return %</th>
@@ -292,6 +293,9 @@ export class InvestmentSummary {
                             <td class="interval-year">Year ${interval.year}</td>
                             <td class="metric-value">
                                 ${this.formatCurrency(interval.totalInvestment)}
+                            </td>
+                            <td class="metric-value">
+                                ${this.formatCurrency(interval.homeValue)}
                             </td>
                             <td class="metric-value ${interval.netProfit >= 0 ? 'positive' : 'negative'}">
                                 ${this.formatCurrency(interval.netProfit)}
@@ -351,19 +355,13 @@ export class InvestmentSummary {
             const returnPercent = totalInvestment > 0 ? (totalReturn / totalInvestment) * 100 : 0;
             const returnComparison = finalResult.return_comparison || 0;
             const cumulativeExpectedReturn = finalResult.cumulative_expected_return || 0;
+            const homeValue = finalResult.home_value || purchasePrice;
             
-            // Calculate net profit summary for the last year (sum of all 12 months of the last year)
-            // This is the summary row value for the last year
-            const numYears = Math.max(1, Math.floor(results.length / 12));
-            const lastYearStartMonth = (numYears - 1) * 12;
-            const lastYearEndMonth = Math.min(numYears * 12 - 1, results.length - 1);
+            // Calculate net profit summary (sum of all net profits across all months)
             let netProfitSummary = 0;
-            for (let month = lastYearStartMonth; month <= lastYearEndMonth; month++) {
-                const monthResult = results.find(r => r.month === month);
-                if (monthResult) {
-                    netProfitSummary += (monthResult.net_profit || 0);
-                }
-            }
+            results.forEach(result => {
+                netProfitSummary += (result.net_profit || 0);
+            });
             
             return `
                 <div class="expandable-scenario-row" data-scenario-index="${index}">
@@ -376,6 +374,10 @@ export class InvestmentSummary {
                             <div class="summary-metric">
                                 <span class="metric-label">Total Investment:</span>
                                 <span class="metric-value">${this.formatCurrency(totalInvestment)}</span>
+                            </div>
+                            <div class="summary-metric">
+                                <span class="metric-label">Home Sale Price:</span>
+                                <span class="metric-value">${this.formatCurrency(homeValue)}</span>
                             </div>
                             <div class="summary-metric">
                                 <span class="metric-label">Net Profit:</span>
@@ -445,9 +447,9 @@ export class InvestmentSummary {
 
         // Return comparison insight
         if (returnComparison > 1) {
-            insights.push(`<li><strong>Outperforming Alternative Investments:</strong> This property investment would generate ${((returnComparison - 1) * 100).toFixed(1)}% more return than investing the same capital at your expected return rate (${(expectedReturnRate * 100).toFixed(2)}%).</li>`);
+            insights.push(`<li><strong>Outperforming Alternative Investments:</strong> This property investment would generate ${((returnComparison - 1) * 100).toFixed(1)}% more return than investing the same capital at your expected return rate (${(expectedReturnRate).toFixed(2)}%).</li>`);
         } else if (returnComparison < 1) {
-            insights.push(`<li><strong>Underperforming Alternative Investments:</strong> This property investment would generate ${((1 - returnComparison) * 100).toFixed(1)}% less return than investing the same capital at your expected return rate (${(expectedReturnRate * 100).toFixed(2)}%).</li>`);
+            insights.push(`<li><strong>Underperforming Alternative Investments:</strong> This property investment would generate ${((1 - returnComparison) * 100).toFixed(1)}% less return than investing the same capital at your expected return rate (${(expectedReturnRate ).toFixed(2)}%).</li>`)
         } else {
             insights.push(`<li><strong>Similar Performance:</strong> This property investment performs similarly to your expected return rate for alternative investments.</li>`);
         }
