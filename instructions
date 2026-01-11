@@ -1,0 +1,46 @@
+we will be making a calculator that helps users decide if a real estate investment is right for them
+
+this will be a web app hosted on localhost 6006
+
+the back end shoudl python with all computation and work done in python, it should eb served via flask and the front app should be typescript, with css and html for ui
+
+at no point should you ever use code in quotes, all such work should eb n it's own files and functions and integrated appropriately
+
+files should be very narrow in their purpose they should be no more than 500 lines and be specific to what they do for example the computation and dispaly fo a particular feature should be different files, on ui if we have majour areas lilke sidepanels they should be different files, if theose side panels have tabs those cna also be different files with a main sdidebar file that combines the tabs and then a file to combine all the feature son the main page, ike tabels isdebar graphs etc
+
+in egenral make it incredibly modular and easy to follow and debug
+
+nowhere should 2 lines of code control the same didpslay or object
+
+make sure that functions are not duplicated but instead put into utility files if they will eb used more than once, or inherited appropriately
+
+the tool should launch via a app.py script that start it up
+
+this tool will calculate and show over time investment costs and growth 
+
+put all files in an app folder 
+
+the major area will be a table that will have yeasr as rows and a number of collumns, there should be a sidebar that explains each column and the formulat used to compute it
+
+columns:
+principal remaining ( above this column the user should have two intput boxes, purchase price and downpayment ammount)
+mortgage payments  ( aboev this column there should be a input box for the interest rate for the loan)
+principal paid
+interest paid ( above this column there should be an input box for the lenght of the load in years at the start of the period)
+maitenance fees ( abve this column there should be a input box for assumed main fee increase ( yearly))
+property tax (above this column there should be an inputbox for assumed property tax increase ( yearly))
+insurance paid (above this column there should be an input box for insurance ammount)
+utilities (above this column there should be a input box for approximate utilities ammount)
+repairs (above this column there should be an input box for approximate reapirs)
+total expenses (this should sum the payments, maintenance, propery tax, insurance, utilities and repais ammounts)
+deductible expenses(simialr to total expenses but sum interest paid instead of payments made)
+rental income ( above this column ther eshould eb a box for approximate increase in this collum, and one for monthly rental income)
+taxable income(  this should subtract deductible expenses from the rental income)
+taxes due (above this column should be a box that lets the user set marginal tax rate, then it should apply that rate to the taxable income)
+net profit( this should be rental income - expenses - taxes due)
+cumulative investment (this should sum all the net profit up to and including this row as well as the downpayment ammount)
+expected return ( aboev this column have a input box for expected return, this should be a computation of applyign the expected return input to the net profit, then mutlipley it by -1)
+cumulative expected return ( this should be a column that computes how much the investor would have made on all the money they have put into this so far, compunded anually using the expected return rate from the rpevious column input and including the downpayment)
+
+use proper mortgage payment caluclation functions to compute the payments and interest paid etc accountign for interest accrued as a real bank would
+
