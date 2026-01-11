@@ -121,7 +121,7 @@ export class InvestmentSummary {
                         <span class="metric-value">${this.formatCurrency(homeValue)}</span>
                     </div>
                     <div class="summary-metric">
-                        <span class="metric-label">Net Profit:</span>
+                        <span class="metric-label">Total Rental Gains:</span>
                         <span class="metric-value ${netProfitSummary >= 0 ? 'positive' : 'negative'}">
                             ${this.formatCurrency(netProfitSummary)}
                         </span>
@@ -280,7 +280,7 @@ export class InvestmentSummary {
                         <th>Year</th>
                         <th>Total Investment</th>
                         <th>Home Sale Price</th>
-                        <th>Net Profit</th>
+                        <th>Rental Gains</th>
                         <th>Return if Sold</th>
                         <th>Return %</th>
                         <th>Expected Investment Return</th>
@@ -380,7 +380,7 @@ export class InvestmentSummary {
                                 <span class="metric-value">${this.formatCurrency(homeValue)}</span>
                             </div>
                             <div class="summary-metric">
-                                <span class="metric-label">Net Profit:</span>
+                                <span class="metric-label">Total Rental Gains:</span>
                                 <span class="metric-value ${netProfitSummary >= 0 ? 'positive' : 'negative'}">
                                     ${this.formatCurrency(netProfitSummary)}
                                 </span>

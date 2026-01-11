@@ -702,19 +702,26 @@ export class FormulaModal {
 
         switch (columnKey) {
             case 'mortgage_payments': {
-                // Mortgage payment uses amortization formula
-                // P = Principal * (r * (1 + r)^n) / ((1 + r)^n - 1)
+                // Mortgage payment uses amortization formula or interest-only
+                // P = Principal * (r * (1 + r)^n) / ((1 + r)^n - 1) for principal and interest
+                // P = Principal * r for interest-only
                 const purchasePrice = inputValues.get('purchase_price') || 0;
                 const downpaymentPercent = (inputValues.get('downpayment_percentage') || 0) / 100;
                 const loanPrincipal = purchasePrice * (1 - downpaymentPercent);
                 const annualRate = (inputValues.get('interest_rate') || 0) / 100;
                 const loanYears = inputValues.get('loan_years') || 30;
+                const paymentType = inputValues.get('payment_type') || 'Principal and Interest';
                 const monthlyRate = annualRate / 12;
                 const numPayments = loanYears * 12;
                 
                 // Calculate monthly payment
                 let monthlyPayment;
-                if (annualRate === 0) {
+                const isInterestOnly = paymentType === 'Interest Only';
+                
+                if (isInterestOnly) {
+                    // Interest-only: payment is just the monthly interest
+                    monthlyPayment = loanPrincipal * monthlyRate;
+                } else if (annualRate === 0) {
                     monthlyPayment = loanPrincipal / numPayments;
                 } else {
                     const numerator = monthlyRate * Math.pow(1 + monthlyRate, numPayments);
@@ -734,7 +741,32 @@ export class FormulaModal {
                 const denominatorValue = onePlusRateToN - 1;
                 const amortizationFactor = numeratorValue / denominatorValue;
                 
-                if (annualRate === 0) {
+                if (isInterestOnly) {
+                    // Interest-only payment formula
+                    if (yearData && yearData.length > 0) {
+                        breakdown.expression = [
+                            { type: 'value', value: formatCurrency(loanPrincipal), label: 'Loan Principal', source: `Purchase Price (${formatCurrency(purchasePrice)}) - Downpayment (${formatPercent(downpaymentPercent)})` },
+                            { type: 'operator', value: '×' },
+                            { type: 'value', value: formatPercent(monthlyRate), label: 'Monthly Rate (r)', source: `Annual Rate (${formatPercent(annualRate)}) ÷ 12` },
+                            { type: 'equals', value: '=' },
+                            { type: 'text', value: formatCurrency(monthlyPayment) },
+                            { type: 'text', value: ' (monthly, interest only)' },
+                            { type: 'operator', value: '×' },
+                            { type: 'value', value: `${yearData.length}`, label: 'Number of Months', source: `Year ${data.year || yearData[0].year}` },
+                            { type: 'equals', value: '=' },
+                            { type: 'text', value: formatCurrency(paymentAmount) }
+                        ];
+                    } else {
+                        breakdown.expression = [
+                            { type: 'value', value: formatCurrency(loanPrincipal), label: 'Loan Principal', source: `Purchase Price (${formatCurrency(purchasePrice)}) - Downpayment (${formatPercent(downpaymentPercent)})` },
+                            { type: 'operator', value: '×' },
+                            { type: 'value', value: formatPercent(monthlyRate), label: 'Monthly Rate (r)', source: `Annual Rate (${formatPercent(annualRate)}) ÷ 12` },
+                            { type: 'equals', value: '=' },
+                            { type: 'text', value: formatCurrency(monthlyPayment) },
+                            { type: 'text', value: ' (interest only)' }
+                        ];
+                    }
+                } else if (annualRate === 0) {
                     // Zero interest case
                     if (yearData && yearData.length > 0) {
                         breakdown.expression = [

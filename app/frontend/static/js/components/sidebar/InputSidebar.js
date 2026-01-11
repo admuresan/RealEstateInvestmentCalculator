@@ -2,6 +2,7 @@
  * Input sidebar component for all calculator inputs organized by category.
  */
 import { InputGroup } from '../inputs/InputGroup.js';
+import { SelectGroup } from '../inputs/SelectGroup.js';
 export class InputSidebar {
     constructor(parent, createHeader = true) {
         this.inputGroups = new Map();
@@ -278,8 +279,15 @@ export class InputSidebar {
     }
     createMortgageCategory() {
         const content = this.createCategory('Mortgage');
+        const paymentTypeSelect = new SelectGroup(
+            content, 
+            'Payment Type', 
+            ['Principal and Interest', 'Interest Only'], 
+            'Principal and Interest'
+        );
         const interestRateInput = new InputGroup(content, 'Interest Rate (%)', 'number', '', '0.1');
         const loanYearsInput = new InputGroup(content, 'Loan Years', 'number', '', '1');
+        this.inputGroups.set('payment_type', paymentTypeSelect);
         this.inputGroups.set('interest_rate', interestRateInput);
         this.inputGroups.set('loan_years', loanYearsInput);
     }

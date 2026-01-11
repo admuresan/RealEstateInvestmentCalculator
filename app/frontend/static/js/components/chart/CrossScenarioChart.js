@@ -52,6 +52,7 @@ export class CrossScenarioChart {
             flex-direction: column;
             width: 100%;
             height: 100%;
+            max-height: 100%;
             background: white;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -80,10 +81,11 @@ export class CrossScenarioChart {
             flex-direction: row;
             flex: 1;
             min-height: 0;
+            overflow: hidden;
         `;
         
-        // Create left sidebar (column checkboxes for left y-axis)
-        this.leftSidebar = this.createColumnSidebar('left', 'Left Y-Axis');
+        // Create unified sidebar (column checkboxes with left/right options)
+        this.leftSidebar = this.createUnifiedColumnSidebar();
         mainContent.appendChild(this.leftSidebar);
         
         // Create chart area
@@ -95,6 +97,9 @@ export class CrossScenarioChart {
             flex-direction: column;
             min-width: 0;
             padding: 1rem;
+            padding-bottom: 1rem;
+            min-height: 0;
+            overflow: hidden;
         `;
         
         const canvasContainer = document.createElement('div');
@@ -102,7 +107,9 @@ export class CrossScenarioChart {
         canvasContainer.style.cssText = `
             flex: 1;
             position: relative;
-            min-height: 400px;
+            min-height: 300px;
+            margin-bottom: 1rem;
+            min-width: 0;
         `;
         this.canvas = document.createElement('canvas');
         this.canvas.id = 'crossScenarioChart';
@@ -111,9 +118,9 @@ export class CrossScenarioChart {
         
         mainContent.appendChild(chartArea);
         
-        // Create right sidebar (column checkboxes for right y-axis)
-        this.rightSidebar = this.createColumnSidebar('right', 'Right Y-Axis');
-        mainContent.appendChild(this.rightSidebar);
+        // Create legend sidebar (table-based legend)
+        this.legendSidebar = this.createLegendSidebar();
+        mainContent.appendChild(this.legendSidebar);
         
         this.container.appendChild(mainContent);
         
@@ -128,8 +135,11 @@ export class CrossScenarioChart {
             flex-wrap: wrap;
             gap: 1rem;
             align-items: center;
+            flex-shrink: 0;
             max-height: 120px;
             overflow-y: auto;
+            position: relative;
+            z-index: 10;
         `;
         
         const scenarioLabel = document.createElement('span');
@@ -157,20 +167,20 @@ export class CrossScenarioChart {
         this.initializeChart();
     }
     
-    createColumnSidebar(side, label) {
+    createUnifiedColumnSidebar() {
         const sidebar = document.createElement('div');
-        sidebar.className = `cross-scenario-sidebar cross-scenario-sidebar-${side}`;
+        sidebar.className = 'cross-scenario-sidebar cross-scenario-sidebar-unified';
         sidebar.style.cssText = `
-            width: 200px;
+            width: 250px;
             display: flex;
             flex-direction: column;
-            border-${side === 'left' ? 'right' : 'left'}: 1px solid #e0e0e0;
+            border-right: 1px solid #e0e0e0;
             background: #f8f9fa;
             overflow: hidden;
         `;
         
         const sidebarTitle = document.createElement('div');
-        sidebarTitle.textContent = label;
+        sidebarTitle.textContent = 'Y-Axis Selection';
         sidebarTitle.style.cssText = `
             padding: 0.75rem;
             font-weight: 600;
@@ -180,64 +190,255 @@ export class CrossScenarioChart {
         sidebar.appendChild(sidebarTitle);
         
         const scrollContainer = document.createElement('div');
-        scrollContainer.className = `cross-scenario-column-list-${side}`;
+        scrollContainer.className = 'cross-scenario-column-list-unified';
         scrollContainer.style.cssText = `
             flex: 1;
             overflow-y: auto;
             padding: 0.5rem;
         `;
         
-        // Create checkboxes for each column
+        // Create checkboxes for each column with left/right options
         this.allColumns.forEach(column => {
-            const checkboxContainer = document.createElement('label');
-            checkboxContainer.style.cssText = `
-                display: flex;
-                align-items: center;
+            const columnContainer = document.createElement('div');
+            columnContainer.style.cssText = `
                 padding: 0.5rem;
-                cursor: pointer;
                 border-radius: 4px;
                 transition: background 0.2s;
+                margin-bottom: 0.25rem;
             `;
-            checkboxContainer.addEventListener('mouseenter', () => {
-                checkboxContainer.style.background = '#e9ecef';
+            columnContainer.addEventListener('mouseenter', () => {
+                columnContainer.style.background = '#e9ecef';
             });
-            checkboxContainer.addEventListener('mouseleave', () => {
-                checkboxContainer.style.background = 'transparent';
-            });
-            
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.value = column;
-            checkbox.dataset.side = side;
-            // Set initial checked state from saved selections
-            if (side === 'left') {
-                checkbox.checked = this.selectedLeftColumns.has(column);
-            } else {
-                checkbox.checked = this.selectedRightColumns.has(column);
-            }
-            checkbox.style.cssText = `
-                margin-right: 0.5rem;
-                cursor: pointer;
-            `;
-            
-            checkbox.addEventListener('change', () => {
-                this.handleColumnToggle(side, column, checkbox.checked);
+            columnContainer.addEventListener('mouseleave', () => {
+                columnContainer.style.background = 'transparent';
             });
             
-            const labelText = document.createElement('span');
-            labelText.textContent = this.formatColumnName(column);
-            labelText.style.cssText = `
+            // Column name label
+            const columnLabel = document.createElement('div');
+            columnLabel.textContent = this.formatColumnName(column);
+            columnLabel.style.cssText = `
                 font-size: 0.9rem;
+                font-weight: 500;
+                margin-bottom: 0.25rem;
                 user-select: none;
             `;
+            columnContainer.appendChild(columnLabel);
             
-            checkboxContainer.appendChild(checkbox);
-            checkboxContainer.appendChild(labelText);
-            scrollContainer.appendChild(checkboxContainer);
+            // Checkbox container for left and right
+            const checkboxRow = document.createElement('div');
+            checkboxRow.style.cssText = `
+                display: flex;
+                gap: 1rem;
+                padding-left: 0.5rem;
+            `;
+            
+            // Left Y-axis checkbox
+            const leftLabel = document.createElement('label');
+            leftLabel.style.cssText = `
+                display: flex;
+                align-items: center;
+                cursor: pointer;
+                font-size: 0.85rem;
+                user-select: none;
+            `;
+            const leftCheckbox = document.createElement('input');
+            leftCheckbox.type = 'checkbox';
+            leftCheckbox.value = column;
+            leftCheckbox.dataset.side = 'left';
+            leftCheckbox.checked = this.selectedLeftColumns.has(column);
+            leftCheckbox.style.cssText = `
+                margin-right: 0.25rem;
+                cursor: pointer;
+            `;
+            leftCheckbox.addEventListener('change', () => {
+                this.handleColumnToggle('left', column, leftCheckbox.checked);
+            });
+            const leftLabelText = document.createElement('span');
+            leftLabelText.textContent = 'Left';
+            leftLabel.appendChild(leftCheckbox);
+            leftLabel.appendChild(leftLabelText);
+            checkboxRow.appendChild(leftLabel);
+            
+            // Right Y-axis checkbox
+            const rightLabel = document.createElement('label');
+            rightLabel.style.cssText = `
+                display: flex;
+                align-items: center;
+                cursor: pointer;
+                font-size: 0.85rem;
+                user-select: none;
+            `;
+            const rightCheckbox = document.createElement('input');
+            rightCheckbox.type = 'checkbox';
+            rightCheckbox.value = column;
+            rightCheckbox.dataset.side = 'right';
+            rightCheckbox.checked = this.selectedRightColumns.has(column);
+            rightCheckbox.style.cssText = `
+                margin-right: 0.25rem;
+                cursor: pointer;
+            `;
+            rightCheckbox.addEventListener('change', () => {
+                this.handleColumnToggle('right', column, rightCheckbox.checked);
+            });
+            const rightLabelText = document.createElement('span');
+            rightLabelText.textContent = 'Right';
+            rightLabel.appendChild(rightCheckbox);
+            rightLabel.appendChild(rightLabelText);
+            checkboxRow.appendChild(rightLabel);
+            
+            columnContainer.appendChild(checkboxRow);
+            scrollContainer.appendChild(columnContainer);
         });
         
         sidebar.appendChild(scrollContainer);
         return sidebar;
+    }
+    
+    createLegendSidebar() {
+        const sidebar = document.createElement('div');
+        sidebar.className = 'cross-scenario-legend-sidebar';
+        sidebar.style.cssText = `
+            width: 375px;
+            display: flex;
+            flex-direction: column;
+            border-left: 1px solid #e0e0e0;
+            background: #f8f9fa;
+            overflow: hidden;
+        `;
+        
+        const sidebarTitle = document.createElement('div');
+        sidebarTitle.textContent = 'Legend';
+        sidebarTitle.style.cssText = `
+            padding: 0.75rem;
+            font-weight: 600;
+            border-bottom: 1px solid #e0e0e0;
+            background: white;
+        `;
+        sidebar.appendChild(sidebarTitle);
+        
+        const scrollContainer = document.createElement('div');
+        scrollContainer.className = 'cross-scenario-legend-container';
+        scrollContainer.style.cssText = `
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: auto;
+            padding: 0.5rem;
+        `;
+        
+        this.legendTable = document.createElement('table');
+        this.legendTable.style.cssText = `
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        `;
+        scrollContainer.appendChild(this.legendTable);
+        sidebar.appendChild(scrollContainer);
+        
+        return sidebar;
+    }
+    
+    updateLegendTable() {
+        if (!this.legendTable || !this.chart) return;
+        
+        // Clear existing table
+        this.legendTable.innerHTML = '';
+        
+        // Get all selected columns (from both left and right)
+        const allSelectedColumns = new Set([...this.selectedLeftColumns, ...this.selectedRightColumns]);
+        if (allSelectedColumns.size === 0 || this.selectedScenarios.size === 0) {
+            return;
+        }
+        
+        // Get sorted scenario indices
+        const sortedScenarios = Array.from(this.selectedScenarios).sort((a, b) => a - b);
+        
+        // Create header row
+        const headerRow = document.createElement('tr');
+        const emptyHeader = document.createElement('th');
+        emptyHeader.style.cssText = `
+            padding: 0.5rem;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #dee2e6;
+            background: white;
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        `;
+        headerRow.appendChild(emptyHeader);
+        
+        sortedScenarios.forEach(scenarioIndex => {
+            const scenarioName = this.scenarioNames.get(scenarioIndex) || `Scenario ${scenarioIndex + 1}`;
+            const th = document.createElement('th');
+            th.textContent = scenarioName;
+            th.style.cssText = `
+                padding: 0.5rem;
+                text-align: center;
+                font-weight: 600;
+                border-bottom: 2px solid #dee2e6;
+                background: white;
+                position: sticky;
+                top: 0;
+                z-index: 5;
+                font-size: 0.8rem;
+            `;
+            headerRow.appendChild(th);
+        });
+        this.legendTable.appendChild(headerRow);
+        
+        // Create rows for each column
+        const sortedColumns = Array.from(allSelectedColumns).sort();
+        sortedColumns.forEach(column => {
+            const row = document.createElement('tr');
+            
+            // Column name cell
+            const columnCell = document.createElement('td');
+            columnCell.textContent = this.formatColumnName(column);
+            columnCell.style.cssText = `
+                padding: 0.5rem;
+                text-align: left;
+                font-weight: 500;
+                border-bottom: 1px solid #e9ecef;
+                background: white;
+                white-space: nowrap;
+            `;
+            row.appendChild(columnCell);
+            
+            // Color cells for each scenario
+            sortedScenarios.forEach(scenarioIndex => {
+                const colorCell = document.createElement('td');
+                colorCell.style.cssText = `
+                    padding: 0.5rem;
+                    text-align: center;
+                    border-bottom: 1px solid #e9ecef;
+                    background: white;
+                `;
+                
+                // Find the dataset for this column and scenario
+                const datasetLabel = `${this.scenarioNames.get(scenarioIndex) || `Scenario ${scenarioIndex + 1}`} - ${this.formatColumnName(column)}`;
+                const dataset = this.chart.data.datasets.find(ds => ds.label === datasetLabel);
+                
+                if (dataset) {
+                    const colorBox = document.createElement('div');
+                    colorBox.style.cssText = `
+                        width: 30px;
+                        height: 20px;
+                        background-color: ${dataset.borderColor};
+                        border: 1px solid #dee2e6;
+                        border-radius: 3px;
+                        margin: 0 auto;
+                    `;
+                    colorCell.appendChild(colorBox);
+                } else {
+                    colorCell.textContent = '-';
+                    colorCell.style.color = '#999';
+                }
+                
+                row.appendChild(colorCell);
+            });
+            
+            this.legendTable.appendChild(row);
+        });
     }
     
     formatColumnName(column) {
@@ -253,7 +454,7 @@ export class CrossScenarioChart {
                 // Remove from right if it's there
                 this.selectedRightColumns.delete(column);
                 // Update right checkbox
-                const rightCheckbox = this.rightSidebar.querySelector(`input[value="${column}"]`);
+                const rightCheckbox = this.leftSidebar.querySelector(`input[value="${column}"][data-side="right"]`);
                 if (rightCheckbox) {
                     rightCheckbox.checked = false;
                 }
@@ -266,7 +467,7 @@ export class CrossScenarioChart {
                 // Remove from left if it's there
                 this.selectedLeftColumns.delete(column);
                 // Update left checkbox
-                const leftCheckbox = this.leftSidebar.querySelector(`input[value="${column}"]`);
+                const leftCheckbox = this.leftSidebar.querySelector(`input[value="${column}"][data-side="left"]`);
                 if (leftCheckbox) {
                     leftCheckbox.checked = false;
                 }
@@ -367,6 +568,7 @@ export class CrossScenarioChart {
         }
         
         this.updateChart();
+        // Legend will be updated by updateChart -> updateLegendTable
     }
     
     saveSelections() {
@@ -621,10 +823,14 @@ export class CrossScenarioChart {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                layout: {
+                    padding: {
+                        bottom: 50
+                    }
+                },
                 plugins: {
                     legend: {
-                        display: true,
-                        position: 'top',
+                        display: false,
                     },
                     tooltip: {
                         mode: 'index',
@@ -696,6 +902,12 @@ export class CrossScenarioChart {
                 }
             }
         });
+        
+        // Update legend table after chart is created
+        // Use setTimeout to ensure chart is fully rendered
+        setTimeout(() => {
+            this.updateLegendTable();
+        }, 100);
     }
     
     updateChart() {
@@ -863,7 +1075,13 @@ export class CrossScenarioChart {
         
         this.chart.data.labels = sortedLabels;
         this.chart.data.datasets = datasets;
-        this.chart.update();
+        this.chart.update('none');
+        
+        // Update legend table after chart is updated
+        // Use setTimeout to ensure chart is fully rendered
+        setTimeout(() => {
+            this.updateLegendTable();
+        }, 100);
     }
 }
 

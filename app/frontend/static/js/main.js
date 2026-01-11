@@ -51,9 +51,11 @@ class InvestmentCalculator {
         const crossScenarioChartContainer = document.createElement('div');
         crossScenarioChartContainer.className = 'cross-scenario-chart-wrapper';
         crossScenarioChartContainer.style.cssText = `
-            height: 500px;
+            height: 600px;
+            min-height: 600px;
+            max-height: 600px;
             margin-bottom: 1rem;
-            min-height: 500px;
+            overflow: hidden;
         `;
         middleContent.appendChild(crossScenarioChartContainer);
         
@@ -429,6 +431,7 @@ class InvestmentCalculator {
                 downpayment_percentage: values.get('downpayment_percentage'),
                 interest_rate: values.get('interest_rate'),
                 loan_years: values.get('loan_years'),
+                payment_type: values.get('payment_type') || 'Principal and Interest',
                 maintenance_base: values.get('maintenance_base'),
                 maintenance_increase: values.get('maintenance_increase'),
                 property_tax_base: values.get('property_tax_base'),

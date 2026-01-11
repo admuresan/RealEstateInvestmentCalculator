@@ -58,6 +58,7 @@ def calculate_investment():
         "downpayment_percentage": float (as percentage, e.g., 20 for 20%),
         "interest_rate": float (as percentage),
         "loan_years": int,
+        "payment_type": str ("Principal and Interest" or "Interest Only"),
         "maintenance_base": float (monthly),
         "maintenance_increase": float (as percentage),
         "property_tax_base": float,
@@ -159,11 +160,18 @@ def calculate_investment():
         commission_percentage = float(Decimal(str(data.get('commission_percentage', 5))) / Decimal('100'))
         num_years = int(data.get('num_years', 30))
         
+        # Extract payment type and normalize it
+        payment_type_raw = data.get('payment_type', 'Principal and Interest')
+        if payment_type_raw == 'Interest Only':
+            payment_type = 'interest_only'
+        else:
+            payment_type = 'principal_and_interest'  # Default
+        
         # Calculate loan principal using Decimal
         loan_principal = float(Decimal(str(purchase_price)) - Decimal(str(downpayment)))
         
         # Calculate monthly payment
-        monthly_payment = calculate_monthly_payment(loan_principal, interest_rate, loan_years)
+        monthly_payment = calculate_monthly_payment(loan_principal, interest_rate, loan_years, payment_type)
         
         # Monthly amounts (divide annual by 12 for insurance and repairs) using Decimal
         insurance_monthly = float(Decimal(str(insurance)) / Decimal('12'))
@@ -227,7 +235,7 @@ def calculate_investment():
             
             # Calculate mortgage breakdown for this month
             mortgage_breakdown = calculate_month_breakdown(
-                principal_remaining, interest_rate, monthly_payment
+                principal_remaining, interest_rate, monthly_payment, payment_type
             )
             
             principal_paid = mortgage_breakdown['principal_paid']

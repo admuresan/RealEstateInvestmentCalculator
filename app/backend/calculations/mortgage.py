@@ -11,14 +11,15 @@ getcontext().Emin = -999999
 getcontext().Emax = 999999
 
 
-def calculate_monthly_payment(principal: float, annual_rate: float, years: int) -> float:
+def calculate_monthly_payment(principal: float, annual_rate: float, years: int, payment_type: str = 'principal_and_interest') -> float:
     """
-    Calculate monthly mortgage payment using standard amortization formula.
+    Calculate monthly mortgage payment using standard amortization formula or interest-only.
     
     Args:
         principal: Loan principal amount
         annual_rate: Annual interest rate (as decimal, e.g., 0.05 for 5%)
         years: Loan term in years
+        payment_type: 'principal_and_interest' or 'interest_only'
     
     Returns:
         Monthly payment amount
@@ -30,6 +31,14 @@ def calculate_monthly_payment(principal: float, annual_rate: float, years: int) 
     if p <= 0 or y <= 0:
         return 0.0
     
+    # For interest-only payments, payment is just the monthly interest
+    if payment_type == 'interest_only':
+        if r == 0:
+            return 0.0
+        monthly_rate = r / Decimal('12')
+        return float(p * monthly_rate)
+    
+    # Standard amortization formula for principal and interest
     if r == 0:
         return float(p / (y * Decimal('12')))
     
@@ -45,14 +54,15 @@ def calculate_monthly_payment(principal: float, annual_rate: float, years: int) 
     return float(payment)
 
 
-def calculate_annual_payment(principal: float, annual_rate: float, years: int) -> float:
+def calculate_annual_payment(principal: float, annual_rate: float, years: int, payment_type: str = 'principal_and_interest') -> float:
     """Calculate annual mortgage payment."""
-    monthly = Decimal(str(calculate_monthly_payment(principal, annual_rate, years)))
+    monthly = Decimal(str(calculate_monthly_payment(principal, annual_rate, years, payment_type)))
     return float(monthly * Decimal('12'))
 
 
 def calculate_year_breakdown(principal_remaining: float, annual_rate: float, 
-                            years_remaining: int, monthly_payment: float) -> dict:
+                            years_remaining: int, monthly_payment: float, 
+                            payment_type: str = 'principal_and_interest') -> dict:
     """
     Calculate principal and interest paid for a given year.
     
@@ -61,6 +71,7 @@ def calculate_year_breakdown(principal_remaining: float, annual_rate: float,
         annual_rate: Annual interest rate (as decimal)
         years_remaining: Years remaining on loan
         monthly_payment: Monthly payment amount
+        payment_type: 'principal_and_interest' or 'interest_only'
     
     Returns:
         Dictionary with 'principal_paid', 'interest_paid', 'principal_remaining'
@@ -87,7 +98,13 @@ def calculate_year_breakdown(principal_remaining: float, annual_rate: float,
             break
         
         interest_for_month = current_principal * monthly_rate
-        principal_for_month = min(mp - interest_for_month, current_principal)
+        
+        if payment_type == 'interest_only':
+            # For interest-only, payment is only interest, no principal reduction
+            principal_for_month = Decimal('0')
+        else:
+            # Standard amortization: principal = payment - interest
+            principal_for_month = min(mp - interest_for_month, current_principal)
         
         principal_paid += principal_for_month
         interest_paid += interest_for_month
@@ -101,7 +118,7 @@ def calculate_year_breakdown(principal_remaining: float, annual_rate: float,
 
 
 def calculate_month_breakdown(principal_remaining: float, annual_rate: float, 
-                              monthly_payment: float) -> dict:
+                              monthly_payment: float, payment_type: str = 'principal_and_interest') -> dict:
     """
     Calculate principal and interest paid for a single month.
     
@@ -109,6 +126,7 @@ def calculate_month_breakdown(principal_remaining: float, annual_rate: float,
         principal_remaining: Remaining principal at start of month
         annual_rate: Annual interest rate (as decimal)
         monthly_payment: Monthly payment amount
+        payment_type: 'principal_and_interest' or 'interest_only'
     
     Returns:
         Dictionary with 'principal_paid', 'interest_paid', 'principal_remaining'
@@ -126,7 +144,14 @@ def calculate_month_breakdown(principal_remaining: float, annual_rate: float,
     
     monthly_rate = r / Decimal('12')
     interest_for_month = p * monthly_rate
-    principal_for_month = min(mp - interest_for_month, p)
+    
+    if payment_type == 'interest_only':
+        # For interest-only, payment is only interest, no principal reduction
+        principal_for_month = Decimal('0')
+    else:
+        # Standard amortization: principal = payment - interest
+        principal_for_month = min(mp - interest_for_month, p)
+    
     new_principal = max(Decimal('0'), p - principal_for_month)
     
     return {
