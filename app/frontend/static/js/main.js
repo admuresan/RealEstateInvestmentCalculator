@@ -13,6 +13,7 @@ import { InvestmentSummary } from './components/InvestmentSummary.js';
 import { ScenarioTabs } from './components/scenario/ScenarioTabs.js';
 import { DisplayTabs } from './components/scenario/DisplayTabs.js';
 import { LoadingOverlay } from './components/LoadingOverlay.js';
+import { ScenarioDifferences } from './components/ScenarioDifferences.js';
 import { calculateInvestment } from './utils/api.js';
 
 class InvestmentCalculator {
@@ -48,6 +49,11 @@ class InvestmentCalculator {
         // Create middle content area (charts + table)
         const middleContent = document.createElement('div');
         middleContent.className = 'middle-content-wrapper';
+        
+        // Create scenario differences container (at the very top)
+        const scenarioDifferencesContainer = document.createElement('div');
+        scenarioDifferencesContainer.className = 'scenario-differences-wrapper';
+        middleContent.appendChild(scenarioDifferencesContainer);
         
         // Create overall performance container (at top)
         const performanceContainer = document.createElement('div');
@@ -113,6 +119,11 @@ class InvestmentCalculator {
             if (this.columnVisibility) {
                 this.columnVisibility.setColumnVisibility(visibleColumns);
             }
+        });
+        
+        // Initialize scenario differences component
+        this.scenarioDifferences = new ScenarioDifferences(scenarioDifferencesContainer, () => {
+            return this.getScenarioDataArray();
         });
         
         // Initialize summary for performance section (shared across all scenarios)
@@ -248,6 +259,10 @@ class InvestmentCalculator {
             inputSidebar.addInputChangeListener(() => {
                 // Save scenarios when inputs change
                 this.scenarioTabs.saveScenarios();
+                // Update scenario differences
+                if (this.scenarioDifferences) {
+                    this.scenarioDifferences.refresh();
+                }
                 this.performCalculationForScenario(index);
             });
         });
@@ -256,6 +271,11 @@ class InvestmentCalculator {
     setupEventListeners() {
         // Set up input change listeners for all scenario tabs
         this.setupInputChangeListeners();
+        
+        // Update scenario differences when scenarios are loaded
+        if (this.scenarioDifferences) {
+            this.scenarioDifferences.refresh();
+        }
         
         // Override handleAddTab to also create display tab
         const originalHandleAddTab = this.scenarioTabs.handleAddTab.bind(this.scenarioTabs);
@@ -293,6 +313,10 @@ class InvestmentCalculator {
                         tab.inputSidebar.addInputChangeListener(() => {
                             // Save scenarios when inputs change
                             this.scenarioTabs.saveScenarios();
+                            // Update scenario differences
+                            if (this.scenarioDifferences) {
+                                this.scenarioDifferences.refresh();
+                            }
                             // Perform calculation for this scenario
                             this.performCalculationForScenario(newTabIndex);
                         });
@@ -361,6 +385,11 @@ class InvestmentCalculator {
         
         // Update cross-scenario chart
         this.updateCrossScenarioChart();
+        
+        // Update scenario differences
+        if (this.scenarioDifferences) {
+            this.scenarioDifferences.refresh();
+        }
         
         // Recalculate all remaining scenarios
         this.performCalculationForAllScenarios();
@@ -566,6 +595,11 @@ class InvestmentCalculator {
             
             // Update cross-scenario chart
             this.updateCrossScenarioChart();
+            
+            // Update scenario differences
+            if (this.scenarioDifferences) {
+                this.scenarioDifferences.refresh();
+            }
         }
         catch (error) {
             console.error('Calculation error:', error);
@@ -683,6 +717,27 @@ class InvestmentCalculator {
         
         // Update scenario data
         this.crossScenarioChart.updateScenarioData(this.scenarioData);
+    }
+    
+    getScenarioDataArray() {
+        // Get all scenario data as an array for the scenario differences component
+        const scenarioCount = this.scenarioTabs.getScenarioCount();
+        const scenariosArray = [];
+        
+        for (let i = 0; i < scenarioCount; i++) {
+            const tab = this.scenarioTabs.getTab(i);
+            if (tab && tab.inputSidebar) {
+                const inputValues = tab.inputSidebar.getInputValues();
+                const name = tab.name || `Scenario ${i + 1}`;
+                scenariosArray.push({
+                    name: name,
+                    inputValues: inputValues,
+                    results: this.scenarioData.get(i)?.results || null
+                });
+            }
+        }
+        
+        return scenariosArray;
     }
 
     getTab(scenarioIndex) {

@@ -71,19 +71,131 @@ export class ScenarioTabs {
         ]);
     }
 
+    /**
+     * Backup existing scenarios to prevent data loss from redirects
+     */
+    backupScenarios() {
+        try {
+            const savedScenarioCount = localStorage.getItem('calculator_scenario_count');
+            if (savedScenarioCount && parseInt(savedScenarioCount, 10) > 0) {
+                const backup = {
+                    timestamp: Date.now(),
+                    scenarioCount: savedScenarioCount,
+                    activeScenario: localStorage.getItem('calculator_active_scenario') || '0',
+                    scenarios: {}
+                };
+                
+                // Backup all scenario data
+                for (let i = 0; i < parseInt(savedScenarioCount, 10); i++) {
+                    const scenarioKey = `calculator_inputs_scenario_${i}`;
+                    const scenarioData = localStorage.getItem(scenarioKey);
+                    if (scenarioData) {
+                        backup.scenarios[i] = scenarioData;
+                    }
+                }
+                
+                // Save backup (keep only the most recent backup)
+                localStorage.setItem('calculator_scenarios_backup', JSON.stringify(backup));
+                console.log('Scenarios backed up before processing redirect data');
+            }
+        } catch (error) {
+            console.warn('Failed to backup scenarios:', error);
+        }
+    }
+
+    /**
+     * Restore scenarios from backup if data was lost
+     */
+    restoreScenariosFromBackup() {
+        try {
+            const backupStr = localStorage.getItem('calculator_scenarios_backup');
+            if (backupStr) {
+                const backup = JSON.parse(backupStr);
+                const savedScenarioCount = localStorage.getItem('calculator_scenario_count');
+                
+                // Only restore if current data seems lost or corrupted
+                if (!savedScenarioCount || parseInt(savedScenarioCount, 10) === 0) {
+                    console.log('Restoring scenarios from backup');
+                    localStorage.setItem('calculator_scenario_count', backup.scenarioCount);
+                    localStorage.setItem('calculator_active_scenario', backup.activeScenario);
+                    
+                    Object.entries(backup.scenarios).forEach(([index, data]) => {
+                        localStorage.setItem(`calculator_inputs_scenario_${index}`, data);
+                    });
+                    
+                    return true;
+                }
+            }
+        } catch (error) {
+            console.warn('Failed to restore scenarios from backup:', error);
+        }
+        return false;
+    }
+
+    /**
+     * Parse URL parameters and return input values if present
+     */
+    parseURLParameters() {
+        try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const inputFields = [
+                'purchase_price', 'downpayment_percentage', 'closing_costs', 'land_transfer_tax',
+                'interest_rate', 'loan_years', 'payment_type',
+                'maintenance_base', 'maintenance_increase',
+                'property_tax_base', 'property_tax_increase',
+                'insurance', 'utilities', 'repairs',
+                'rental_income_base', 'rental_increase',
+                'marginal_tax_rate', 'expected_return_rate',
+                'real_estate_market_increase', 'commission_percentage'
+            ];
+            
+            const urlValues = new Map();
+            let hasURLParams = false;
+            
+            inputFields.forEach(field => {
+                const value = urlParams.get(field);
+                if (value !== null && value !== '') {
+                    hasURLParams = true;
+                    // Try to parse as number, otherwise keep as string
+                    const numValue = parseFloat(value);
+                    if (!isNaN(numValue)) {
+                        urlValues.set(field, numValue);
+                    } else if (field === 'payment_type') {
+                        urlValues.set(field, value);
+                    }
+                }
+            });
+            
+            return hasURLParams ? urlValues : null;
+        } catch (error) {
+            console.warn('Failed to parse URL parameters:', error);
+            return null;
+        }
+    }
+
     loadScenarios() {
         // Set loading flag to prevent saving during load
         this.isLoading = true;
         this.loadingStartTime = Date.now();
         
         try {
+            // Check for URL parameters first (indicates a redirect)
+            const urlValues = this.parseURLParameters();
+            const hasRedirectData = urlValues !== null;
+            
+            // Backup existing scenarios before processing redirect data
+            if (hasRedirectData) {
+                this.backupScenarios();
+            }
+            
             // Check if there are any saved scenarios
             const savedScenarioCount = localStorage.getItem('calculator_scenario_count');
-            const hasSavedData = savedScenarioCount !== null;
+            const hasSavedData = savedScenarioCount !== null && parseInt(savedScenarioCount, 10) > 0;
             
             let scenarioCount = 1;
             let activeIndex = 0;
             let shouldCreateDefaults = false;
+            let shouldAddRedirectAsNewScenario = false;
             
             if (hasSavedData) {
                 // Load scenario count
@@ -92,9 +204,22 @@ export class ScenarioTabs {
                 // Load active scenario index
                 const savedActiveIndex = localStorage.getItem('calculator_active_scenario');
                 activeIndex = savedActiveIndex ? parseInt(savedActiveIndex, 10) : 0;
+                
+                // If redirect data exists AND we have saved scenarios, add redirect data as new scenario
+                if (hasRedirectData) {
+                    shouldAddRedirectAsNewScenario = true;
+                    console.log('Redirect detected with existing scenarios - will add as new scenario to preserve existing data');
+                }
             } else {
-                // No saved data - create default scenario with standard values
-                shouldCreateDefaults = true;
+                // No saved data
+                if (hasRedirectData) {
+                    // Use redirect data for first scenario
+                    console.log('Redirect detected with no existing scenarios - using redirect data for first scenario');
+                    shouldCreateDefaults = false; // Will use URL values instead
+                } else {
+                    // No saved data and no redirect - create default scenario
+                    shouldCreateDefaults = true;
+                }
                 scenarioCount = 1;
                 activeIndex = 0;
             }
@@ -106,8 +231,24 @@ export class ScenarioTabs {
             const savedInputs0 = localStorage.getItem(scenarioKey0);
             let defaultValues = null;
             let savedInputs0Parsed = null;
+            let redirectValues = null;
             
-            if (shouldCreateDefaults) {
+            if (shouldAddRedirectAsNewScenario) {
+                // Redirect data will be added as a new scenario, so load existing scenarios normally
+                if (savedInputs0) {
+                    try {
+                        savedInputs0Parsed = JSON.parse(savedInputs0);
+                    } catch (e) {
+                        console.warn(`Failed to parse inputs for scenario 0:`, e);
+                        defaultValues = this.getDefaultInputValues();
+                    }
+                }
+                // Store redirect values to add later
+                redirectValues = urlValues;
+            } else if (hasRedirectData && !hasSavedData) {
+                // Use redirect data for first scenario (no existing scenarios)
+                redirectValues = urlValues;
+            } else if (shouldCreateDefaults) {
                 // Use default values for first scenario
                 defaultValues = this.getDefaultInputValues();
             } else if (savedInputs0) {
@@ -122,13 +263,23 @@ export class ScenarioTabs {
             
             // Create all tabs from saved data (including first one)
             for (let i = 0; i < scenarioCount; i++) {
-                if (i === 0 && defaultValues && !hasSavedData) {
-                    // Create first tab with default values (only if no saved data)
+                if (i === 0 && defaultValues && !hasSavedData && !hasRedirectData) {
+                    // Create first tab with default values (only if no saved data and no redirect)
                     this.addTab('Scenario 1', defaultValues);
+                } else if (i === 0 && redirectValues && !hasSavedData) {
+                    // Create first tab with redirect values (no existing scenarios)
+                    this.addTab('Scenario 1', redirectValues);
                 } else {
                     // Create tab without values (will be set later)
                     this.addTab(`Scenario ${i + 1}`, null);
                 }
+            }
+            
+            // If redirect data should be added as new scenario, add it now
+            if (shouldAddRedirectAsNewScenario && redirectValues) {
+                this.addTab(`Scenario ${scenarioCount + 1}`, redirectValues);
+                // Set the new scenario as active
+                activeIndex = scenarioCount;
             }
             
             // Notify that scenarios are loaded BEFORE setting values
@@ -147,11 +298,12 @@ export class ScenarioTabs {
                 
                 // Now set values AFTER display tabs are created
                 setTimeout(() => {
-                    // Set values for first scenario (if not already set with defaults)
+                    // Set values for first scenario (if not already set with defaults or redirect values)
                     const tab0 = this.tabs[0];
                     if (tab0 && tab0.inputSidebar) {
-                        if (defaultValues && !hasSavedData) {
-                            // Default values were already set when creating the tab
+                        if ((defaultValues && !hasSavedData && !hasRedirectData) || 
+                            (redirectValues && !hasSavedData)) {
+                            // Default or redirect values were already set when creating the tab
                             // Enable saving and save to ensure it's persisted
                             this.isLoading = false;
                             this.saveScenarios();
@@ -194,11 +346,30 @@ export class ScenarioTabs {
                     this.isLoading = false;
                     // Save to ensure everything is persisted correctly
                     this.saveScenarios();
+                    
+                    // Clear URL parameters after processing to prevent re-processing on refresh
+                    if (hasRedirectData) {
+                        const url = new URL(window.location.href);
+                        url.search = ''; // Clear query parameters
+                        window.history.replaceState({}, '', url);
+                    }
                 }, 100);
             }, 150);
         } catch (error) {
             console.warn('Failed to load scenarios:', error);
-            // If loading fails, ensure at least one tab exists with defaults
+            
+            // Try to restore from backup if loading failed
+            const restored = this.restoreScenariosFromBackup();
+            if (restored) {
+                console.log('Scenarios restored from backup, reloading...');
+                // Reload scenarios after restoration
+                setTimeout(() => {
+                    this.loadScenarios();
+                }, 100);
+                return;
+            }
+            
+            // If loading fails and no backup, ensure at least one tab exists with defaults
             if (this.tabs.length === 0) {
                 const defaults = this.getDefaultInputValues();
                 this.addTab('Scenario 1', defaults);
@@ -258,6 +429,22 @@ export class ScenarioTabs {
         }
         
         try {
+            // Additional safety check: if we're about to save with only 1 scenario but backup exists,
+            // verify we're not accidentally overwriting multiple scenarios
+            const backupStr = localStorage.getItem('calculator_scenarios_backup');
+            if (backupStr && this.tabs.length === 1) {
+                try {
+                    const backup = JSON.parse(backupStr);
+                    const backupCount = parseInt(backup.scenarioCount, 10) || 0;
+                    // If backup has more scenarios than current, warn but allow save (user might have intentionally deleted)
+                    if (backupCount > 1) {
+                        console.log(`Warning: Saving ${this.tabs.length} scenario(s) but backup has ${backupCount}. This may be intentional.`);
+                    }
+                } catch (e) {
+                    // Backup parsing failed, continue with save
+                }
+            }
+            
             // Save scenario count
             localStorage.setItem('calculator_scenario_count', this.tabs.length.toString());
             
@@ -294,6 +481,8 @@ export class ScenarioTabs {
             }
         } catch (error) {
             console.error('Failed to save scenarios:', error);
+            // If save fails, try to restore from backup
+            this.restoreScenariosFromBackup();
         }
     }
 

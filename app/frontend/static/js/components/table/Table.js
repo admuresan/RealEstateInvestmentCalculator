@@ -122,6 +122,12 @@ export class Table {
         
         parent.appendChild(this.container);
         
+        // Store reference to parent wrapper for resize functionality
+        this.wrapper = parent;
+        
+        // Initialize resize functionality
+        this.initializeResize();
+        
         // Sync horizontal scrolling between header and body
         this.bodyContainer.addEventListener('scroll', () => {
             this.headerContainer.scrollLeft = this.bodyContainer.scrollLeft;
@@ -140,7 +146,76 @@ export class Table {
         // Load input values asynchronously (they don't affect column visibility)
         requestAnimationFrame(() => {
             this.loadInputValues();
+            // Update body container height after initial setup
+            setTimeout(() => {
+                this.updateBodyContainerHeight();
+            }, 100);
         });
+    }
+    initializeResize() {
+        // Load saved height from localStorage
+        const savedHeight = localStorage.getItem(`table_height_tab_${this.tabIndex}`);
+        if (savedHeight) {
+            const height = parseInt(savedHeight, 10);
+            if (height && height >= 200) { // Minimum height of 200px
+                this.wrapper.style.height = `${height}px`;
+                this.wrapper.style.maxHeight = `${height}px`;
+                this.updateBodyContainerHeight();
+            }
+        }
+        
+        // Create resize handle
+        const resizeHandle = document.createElement('div');
+        resizeHandle.className = 'table-resize-handle';
+        resizeHandle.title = 'Drag to resize table height';
+        this.wrapper.appendChild(resizeHandle);
+        
+        let isResizing = false;
+        let startY = 0;
+        let startHeight = 0;
+        
+        resizeHandle.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            startY = e.clientY;
+            startHeight = this.wrapper.offsetHeight;
+            document.body.style.cursor = 'ns-resize';
+            document.body.style.userSelect = 'none';
+            e.preventDefault();
+        });
+        
+        const handleMouseMove = (e) => {
+            if (!isResizing) return;
+            
+            const deltaY = e.clientY - startY;
+            const newHeight = Math.max(200, startHeight + deltaY); // Minimum height of 200px
+            
+            this.wrapper.style.height = `${newHeight}px`;
+            this.wrapper.style.maxHeight = `${newHeight}px`;
+            this.updateBodyContainerHeight();
+        };
+        
+        const handleMouseUp = () => {
+            if (isResizing) {
+                isResizing = false;
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                
+                // Save height to localStorage
+                const height = this.wrapper.offsetHeight;
+                localStorage.setItem(`table_height_tab_${this.tabIndex}`, height.toString());
+            }
+        };
+        
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+    }
+    updateBodyContainerHeight() {
+        // Update body container max-height based on wrapper height
+        const wrapperHeight = this.wrapper.offsetHeight;
+        const headerHeight = this.headerContainer.offsetHeight;
+        const padding = 56; // Approximate padding (1rem top + 0.5rem bottom + some margin)
+        const newMaxHeight = Math.max(100, wrapperHeight - headerHeight - padding);
+        this.bodyContainer.style.maxHeight = `${newMaxHeight}px`;
     }
     setInputGroups(inputGroups) {
         this.inputGroups = inputGroups;
@@ -158,8 +233,9 @@ export class Table {
                         // Small delay to ensure value is updated
                         setTimeout(() => this.saveConfiguration(), 0);
                     };
-                    inputElement.addEventListener('input', saveHandler);
+                    // Only listen to 'change' and 'blur' events to avoid recalculation while typing
                     inputElement.addEventListener('change', saveHandler);
+                    inputElement.addEventListener('blur', saveHandler);
                 }
             }
             catch (error) {
@@ -411,6 +487,9 @@ export class Table {
         });
         // Reapply column visibility after updating data (skip save to avoid overwriting saved state)
         this.setColumnVisibility(this.visibleColumns, true);
+        
+        // Update body container height after data update
+        this.updateBodyContainerHeight();
     }
     getInputValues() {
         const values = new Map();
@@ -422,8 +501,9 @@ export class Table {
     addInputChangeListener(handler) {
         // Save is already handled by attachSaveListeners, just call the handler
         this.inputGroups.forEach(inputGroup => {
-            inputGroup.addEventListener('input', handler);
+            // Only listen to 'change' and 'blur' events to avoid recalculation while typing
             inputGroup.addEventListener('change', handler);
+            inputGroup.addEventListener('blur', handler);
         });
     }
 }

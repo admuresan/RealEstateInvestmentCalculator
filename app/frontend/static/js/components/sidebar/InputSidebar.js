@@ -304,6 +304,13 @@ export class InputSidebar {
             landTransferTaxDisplay.value = `$${landTransferTax.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         };
         
+        // Update display only (for real-time updates while typing)
+        const updateDisplayOnly = () => {
+            updateDownpaymentDisplay();
+            updateLandTransferTaxDisplay();
+        };
+        
+        // Update display and trigger save/recalculation (when user leaves the field)
         const saveAndUpdate = () => {
             updateDownpaymentDisplay();
             updateLandTransferTaxDisplay();
@@ -312,12 +319,18 @@ export class InputSidebar {
             }
         };
         
-        purchasePriceInput.addEventListener('input', saveAndUpdate);
+        // Real-time display updates while typing
+        purchasePriceInput.addEventListener('input', updateDisplayOnly);
+        downpaymentInput.addEventListener('input', updateDisplayOnly);
+        closingCostsInput.addEventListener('input', updateDisplayOnly);
+        
+        // Save and recalculation when user leaves the field
         purchasePriceInput.addEventListener('change', saveAndUpdate);
-        downpaymentInput.addEventListener('input', saveAndUpdate);
+        purchasePriceInput.addEventListener('blur', saveAndUpdate);
         downpaymentInput.addEventListener('change', saveAndUpdate);
-        closingCostsInput.addEventListener('input', saveAndUpdate);
+        downpaymentInput.addEventListener('blur', saveAndUpdate);
         closingCostsInput.addEventListener('change', saveAndUpdate);
+        closingCostsInput.addEventListener('blur', saveAndUpdate);
         
         downpaymentGroup.appendChild(downpaymentLabel);
         downpaymentGroup.appendChild(downpaymentInput);
@@ -434,15 +447,17 @@ export class InputSidebar {
                         }
                     }, 0);
                 };
-                inputElement.addEventListener('input', saveHandler);
+                // Only listen to 'change' and 'blur' events to avoid recalculation while typing
                 inputElement.addEventListener('change', saveHandler);
+                inputElement.addEventListener('blur', saveHandler);
             }
         });
     }
     addInputChangeListener(handler) {
         this.inputGroups.forEach(inputGroup => {
-            inputGroup.addEventListener('input', handler);
+            // Only listen to 'change' and 'blur' events to avoid recalculation while typing
             inputGroup.addEventListener('change', handler);
+            inputGroup.addEventListener('blur', handler);
         });
     }
     getInputValues() {
