@@ -5,6 +5,7 @@ import { TableRow } from './TableRow.js';
 import { YearGroupRow } from './YearGroupRow.js';
 import { FormulaModal } from '../FormulaModal.js';
 import { COLUMN_DEFINITIONS } from '../sidebar/ColumnInfo.js';
+import { storage } from '../../utils/storage.js';
 export class Table {
     constructor(parent, inputGroups, tabIndex = 0) {
         this.rows = [];
@@ -153,8 +154,8 @@ export class Table {
         });
     }
     initializeResize() {
-        // Load saved height from localStorage
-        const savedHeight = localStorage.getItem(`table_height_tab_${this.tabIndex}`);
+        // Load saved height from storage
+        const savedHeight = storage.getItem(`table_height_tab_${this.tabIndex}`);
         if (savedHeight) {
             const height = parseInt(savedHeight, 10);
             if (height && height >= 200) { // Minimum height of 200px
@@ -200,9 +201,9 @@ export class Table {
                 document.body.style.cursor = '';
                 document.body.style.userSelect = '';
                 
-                // Save height to localStorage
+                // Save height to storage
                 const height = this.wrapper.offsetHeight;
-                localStorage.setItem(`table_height_tab_${this.tabIndex}`, height.toString());
+                storage.setItem(`table_height_tab_${this.tabIndex}`, height.toString());
             }
         };
         
@@ -257,10 +258,10 @@ export class Table {
                     inputValues[key] = value;
                 }
             });
-            localStorage.setItem('calculator_inputs', JSON.stringify(inputValues));
+            storage.setItem('calculator_inputs', JSON.stringify(inputValues));
             // Save column visibility per tab
             const visibleColumnsArray = Array.from(this.visibleColumns);
-            localStorage.setItem(`calculator_visible_columns_tab_${this.tabIndex}`, JSON.stringify(visibleColumnsArray));
+            storage.setItem(`calculator_visible_columns_tab_${this.tabIndex}`, JSON.stringify(visibleColumnsArray));
         }
         catch (error) {
             console.warn('Failed to save configuration:', error);
@@ -269,10 +270,10 @@ export class Table {
     loadColumnVisibility() {
         try {
             // Load column visibility for this tab
-            let savedColumns = localStorage.getItem(`calculator_visible_columns_tab_${this.tabIndex}`);
+            let savedColumns = storage.getItem(`calculator_visible_columns_tab_${this.tabIndex}`);
             // Fall back to old global key for backward compatibility (only for first tab)
             if (!savedColumns && this.tabIndex === 0) {
-                savedColumns = localStorage.getItem('calculator_visible_columns');
+                savedColumns = storage.getItem('calculator_visible_columns');
             }
             if (savedColumns) {
                 const visibleColumnsArray = JSON.parse(savedColumns);
@@ -297,7 +298,7 @@ export class Table {
         this.isLoadingConfiguration = true;
         try {
             // Load input values
-            const savedInputs = localStorage.getItem('calculator_inputs');
+            const savedInputs = storage.getItem('calculator_inputs');
             if (savedInputs) {
                 const inputValues = JSON.parse(savedInputs);
                 // Set values - setValue on downpayment_percentage will trigger display update

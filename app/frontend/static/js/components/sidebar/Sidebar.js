@@ -2,6 +2,7 @@
  * Sidebar component for displaying column explanations and formulas.
  */
 import { COLUMN_DEFINITIONS } from './ColumnInfo.js';
+import { storage } from '../../utils/storage.js';
 export class Sidebar {
     constructor(parent) {
         this.columnItems = new Map();
@@ -104,14 +105,14 @@ export class Sidebar {
     saveSidebarCollapseState() {
         try {
             const isCollapsed = this.wrapper.classList.contains('collapsed');
-            localStorage.setItem('sidebar_collapsed', JSON.stringify(isCollapsed));
+            storage.setItem('sidebar_collapsed', JSON.stringify(isCollapsed));
         } catch (error) {
             console.warn('Failed to save sidebar collapse state:', error);
         }
     }
     loadSidebarCollapseState() {
         try {
-            const savedState = localStorage.getItem('sidebar_collapsed');
+            const savedState = storage.getItem('sidebar_collapsed');
             if (savedState) {
                 const isCollapsed = JSON.parse(savedState);
                 if (isCollapsed) {
@@ -230,14 +231,14 @@ export class Sidebar {
             this.columnItems.forEach((info, columnName) => {
                 states[columnName] = info.columnItem.classList.contains('collapsed');
             });
-            localStorage.setItem('sidebar_collapse_states', JSON.stringify(states));
+            storage.setItem('sidebar_collapse_states', JSON.stringify(states));
         } catch (error) {
             console.warn('Failed to save collapse states:', error);
         }
     }
     loadCollapseStates() {
         try {
-            const savedStates = localStorage.getItem('sidebar_collapse_states');
+            const savedStates = storage.getItem('sidebar_collapse_states');
             if (savedStates) {
                 const states = JSON.parse(savedStates);
                 this.columnItems.forEach((info, columnName) => {

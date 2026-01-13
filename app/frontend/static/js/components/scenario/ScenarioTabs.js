@@ -3,6 +3,7 @@
  */
 import { InputSidebar } from '../sidebar/InputSidebar.js';
 import { CopyScenarioModal } from '../CopyScenarioModal.js';
+import { storage } from '../../utils/storage.js';
 
 export class ScenarioTabs {
     constructor(parent) {
@@ -76,26 +77,26 @@ export class ScenarioTabs {
      */
     backupScenarios() {
         try {
-            const savedScenarioCount = localStorage.getItem('calculator_scenario_count');
+            const savedScenarioCount = storage.getItem('calculator_scenario_count');
             if (savedScenarioCount && parseInt(savedScenarioCount, 10) > 0) {
                 const backup = {
                     timestamp: Date.now(),
                     scenarioCount: savedScenarioCount,
-                    activeScenario: localStorage.getItem('calculator_active_scenario') || '0',
+                    activeScenario: storage.getItem('calculator_active_scenario') || '0',
                     scenarios: {}
                 };
                 
                 // Backup all scenario data
                 for (let i = 0; i < parseInt(savedScenarioCount, 10); i++) {
                     const scenarioKey = `calculator_inputs_scenario_${i}`;
-                    const scenarioData = localStorage.getItem(scenarioKey);
+                    const scenarioData = storage.getItem(scenarioKey);
                     if (scenarioData) {
                         backup.scenarios[i] = scenarioData;
                     }
                 }
                 
                 // Save backup (keep only the most recent backup)
-                localStorage.setItem('calculator_scenarios_backup', JSON.stringify(backup));
+                storage.setItem('calculator_scenarios_backup', JSON.stringify(backup));
                 console.log('Scenarios backed up before processing redirect data');
             }
         } catch (error) {
@@ -108,19 +109,19 @@ export class ScenarioTabs {
      */
     restoreScenariosFromBackup() {
         try {
-            const backupStr = localStorage.getItem('calculator_scenarios_backup');
+            const backupStr = storage.getItem('calculator_scenarios_backup');
             if (backupStr) {
                 const backup = JSON.parse(backupStr);
-                const savedScenarioCount = localStorage.getItem('calculator_scenario_count');
+                const savedScenarioCount = storage.getItem('calculator_scenario_count');
                 
                 // Only restore if current data seems lost or corrupted
                 if (!savedScenarioCount || parseInt(savedScenarioCount, 10) === 0) {
                     console.log('Restoring scenarios from backup');
-                    localStorage.setItem('calculator_scenario_count', backup.scenarioCount);
-                    localStorage.setItem('calculator_active_scenario', backup.activeScenario);
+                    storage.setItem('calculator_scenario_count', backup.scenarioCount);
+                    storage.setItem('calculator_active_scenario', backup.activeScenario);
                     
                     Object.entries(backup.scenarios).forEach(([index, data]) => {
-                        localStorage.setItem(`calculator_inputs_scenario_${index}`, data);
+                        storage.setItem(`calculator_inputs_scenario_${index}`, data);
                     });
                     
                     return true;
@@ -189,7 +190,7 @@ export class ScenarioTabs {
             }
             
             // Check if there are any saved scenarios
-            const savedScenarioCount = localStorage.getItem('calculator_scenario_count');
+            const savedScenarioCount = storage.getItem('calculator_scenario_count');
             const hasSavedData = savedScenarioCount !== null && parseInt(savedScenarioCount, 10) > 0;
             
             let scenarioCount = 1;
@@ -202,7 +203,7 @@ export class ScenarioTabs {
                 scenarioCount = parseInt(savedScenarioCount, 10) || 1;
                 
                 // Load active scenario index
-                const savedActiveIndex = localStorage.getItem('calculator_active_scenario');
+                const savedActiveIndex = storage.getItem('calculator_active_scenario');
                 activeIndex = savedActiveIndex ? parseInt(savedActiveIndex, 10) : 0;
                 
                 // If redirect data exists AND we have saved scenarios, add redirect data as new scenario
@@ -228,7 +229,7 @@ export class ScenarioTabs {
             
             // Load inputs for first scenario (but don't set values yet)
             const scenarioKey0 = `calculator_inputs_scenario_0`;
-            const savedInputs0 = localStorage.getItem(scenarioKey0);
+            const savedInputs0 = storage.getItem(scenarioKey0);
             let defaultValues = null;
             let savedInputs0Parsed = null;
             let redirectValues = null;
@@ -322,7 +323,7 @@ export class ScenarioTabs {
                     // Load values for additional scenarios
                     for (let i = 1; i < scenarioCount; i++) {
                         const scenarioKey = `calculator_inputs_scenario_${i}`;
-                        const savedInputs = localStorage.getItem(scenarioKey);
+                        const savedInputs = storage.getItem(scenarioKey);
                         
                         if (savedInputs) {
                             try {
@@ -431,7 +432,7 @@ export class ScenarioTabs {
         try {
             // Additional safety check: if we're about to save with only 1 scenario but backup exists,
             // verify we're not accidentally overwriting multiple scenarios
-            const backupStr = localStorage.getItem('calculator_scenarios_backup');
+            const backupStr = storage.getItem('calculator_scenarios_backup');
             if (backupStr && this.tabs.length === 1) {
                 try {
                     const backup = JSON.parse(backupStr);
@@ -446,10 +447,10 @@ export class ScenarioTabs {
             }
             
             // Save scenario count
-            localStorage.setItem('calculator_scenario_count', this.tabs.length.toString());
+            storage.setItem('calculator_scenario_count', this.tabs.length.toString());
             
             // Save active scenario index
-            localStorage.setItem('calculator_active_scenario', this.activeTabIndex.toString());
+            storage.setItem('calculator_active_scenario', this.activeTabIndex.toString());
             
             // Save inputs for each scenario
             this.tabs.forEach((tab, index) => {
@@ -472,12 +473,12 @@ export class ScenarioTabs {
                 });
                 
                 // Always save, even if empty (to preserve scenario structure)
-                localStorage.setItem(scenarioKey, JSON.stringify(valuesObj));
+                storage.setItem(scenarioKey, JSON.stringify(valuesObj));
             });
             
             // Clean up any old scenario entries beyond the current count
             for (let i = this.tabs.length; i < 20; i++) {
-                localStorage.removeItem(`calculator_inputs_scenario_${i}`);
+                storage.removeItem(`calculator_inputs_scenario_${i}`);
             }
         } catch (error) {
             console.error('Failed to save scenarios:', error);
@@ -552,7 +553,7 @@ export class ScenarioTabs {
     saveSidebarCollapseState() {
         try {
             const isCollapsed = this.parent.classList.contains('collapsed');
-            localStorage.setItem('input_sidebar_collapsed', JSON.stringify(isCollapsed));
+            storage.setItem('input_sidebar_collapsed', JSON.stringify(isCollapsed));
         } catch (error) {
             console.warn('Failed to save sidebar collapse state:', error);
         }
@@ -560,7 +561,7 @@ export class ScenarioTabs {
 
     loadSidebarCollapseState() {
         try {
-            const savedState = localStorage.getItem('input_sidebar_collapsed');
+            const savedState = storage.getItem('input_sidebar_collapsed');
             if (savedState) {
                 const isCollapsed = JSON.parse(savedState);
                 if (isCollapsed) {
@@ -883,10 +884,10 @@ export class ScenarioTabs {
         // Remove from array
         this.tabs.splice(index, 1);
         
-        // Remove from localStorage
-        localStorage.removeItem(`calculator_inputs_scenario_${index}`);
+        // Remove from storage
+        storage.removeItem(`calculator_inputs_scenario_${index}`);
         
-        // Renumber remaining scenarios and update localStorage keys
+        // Renumber remaining scenarios and update storage keys
         this.renumberScenarios();
         
         // Update active tab if necessary
@@ -916,7 +917,7 @@ export class ScenarioTabs {
         const tempData = [];
         this.tabs.forEach((tab, oldIndex) => {
             const scenarioKey = `calculator_inputs_scenario_${oldIndex}`;
-            const savedData = localStorage.getItem(scenarioKey);
+            const savedData = storage.getItem(scenarioKey);
             if (savedData) {
                 tempData.push(savedData);
             } else {
@@ -934,12 +935,12 @@ export class ScenarioTabs {
         
         // Clear all scenario keys
         for (let i = 0; i < 20; i++) {
-            localStorage.removeItem(`calculator_inputs_scenario_${i}`);
+            storage.removeItem(`calculator_inputs_scenario_${i}`);
         }
         
         // Save data back with new indices
         tempData.forEach((data, newIndex) => {
-            localStorage.setItem(`calculator_inputs_scenario_${newIndex}`, data);
+            storage.setItem(`calculator_inputs_scenario_${newIndex}`, data);
         });
         
         // Renumber all tabs

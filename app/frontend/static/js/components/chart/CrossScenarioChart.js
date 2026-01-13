@@ -5,6 +5,8 @@
  * - Scenario selection checkboxes
  * - Scrollable column checkboxes on both sides
  */
+import { storage } from '../../utils/storage.js';
+
 export class CrossScenarioChart {
     constructor(parent) {
         this.allColumns = [
@@ -578,7 +580,7 @@ export class CrossScenarioChart {
                 rightColumns: Array.from(this.selectedRightColumns),
                 scenarios: Array.from(this.selectedScenarios)
             };
-            localStorage.setItem('crossScenarioChartSelections', JSON.stringify(selections));
+            storage.setItem('crossScenarioChartSelections', JSON.stringify(selections));
         } catch (error) {
             console.warn('Failed to save cross-scenario chart selections:', error);
         }
@@ -586,7 +588,7 @@ export class CrossScenarioChart {
     
     loadSelections() {
         try {
-            const saved = localStorage.getItem('crossScenarioChartSelections');
+            const saved = storage.getItem('crossScenarioChartSelections');
             if (saved) {
                 const selections = JSON.parse(saved);
                 if (selections.leftColumns && Array.isArray(selections.leftColumns)) {

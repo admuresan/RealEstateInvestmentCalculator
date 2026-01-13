@@ -3,6 +3,7 @@
  */
 import { InputGroup } from '../inputs/InputGroup.js';
 import { SelectGroup } from '../inputs/SelectGroup.js';
+import { storage } from '../../utils/storage.js';
 export class InputSidebar {
     constructor(parent, createHeader = true) {
         this.inputGroups = new Map();
@@ -97,14 +98,14 @@ export class InputSidebar {
     saveSidebarCollapseState() {
         try {
             const isCollapsed = this.wrapper.classList.contains('collapsed');
-            localStorage.setItem('input_sidebar_collapsed', JSON.stringify(isCollapsed));
+            storage.setItem('input_sidebar_collapsed', JSON.stringify(isCollapsed));
         } catch (error) {
             console.warn('Failed to save sidebar collapse state:', error);
         }
     }
     loadSidebarCollapseState() {
         try {
-            const savedState = localStorage.getItem('input_sidebar_collapsed');
+            const savedState = storage.getItem('input_sidebar_collapsed');
             if (savedState) {
                 const isCollapsed = JSON.parse(savedState);
                 if (isCollapsed) {
@@ -194,14 +195,14 @@ export class InputSidebar {
             this.categories.forEach((info, title) => {
                 states[title] = info.category.classList.contains('collapsed');
             });
-            localStorage.setItem('input_sidebar_collapse_states', JSON.stringify(states));
+            storage.setItem('input_sidebar_collapse_states', JSON.stringify(states));
         } catch (error) {
             console.warn('Failed to save collapse states:', error);
         }
     }
     loadCollapseStates() {
         try {
-            const savedStates = localStorage.getItem('input_sidebar_collapse_states');
+            const savedStates = storage.getItem('input_sidebar_collapse_states');
             if (savedStates) {
                 const states = JSON.parse(savedStates);
                 this.categories.forEach((info, title) => {
@@ -503,7 +504,7 @@ export class InputSidebar {
     }
     loadConfiguration() {
         try {
-            const savedInputs = localStorage.getItem('calculator_inputs');
+            const savedInputs = storage.getItem('calculator_inputs');
             if (savedInputs) {
                 const inputValues = JSON.parse(savedInputs);
                 this.inputGroups.forEach((inputGroup, key) => {

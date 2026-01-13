@@ -18,8 +18,8 @@ from app.backend.app import create_app
 if __name__ == '__main__':
     app = create_app()
     
-    # Production settings - port from environment variable or default to 5001
-    port = int(os.environ.get('PORT', 5001))
+    # Production settings - port from environment variable or default to 6006 (same as local)
+    port = int(os.environ.get('PORT', 6006))
     
     print(f"Starting Real Estate Investment Calculator on port {port}...")
     app.run(host='0.0.0.0', port=port, debug=False)
