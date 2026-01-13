@@ -10,7 +10,7 @@ SERVER_IP="40.233.70.245"
 SERVER_USER="ubuntu"
 SSH_KEY="ssh/ssh-key-2025-12-26.key"
 APP_NAME="calculator"
-APP_DIR="/home/$SERVER_USER/$APP_NAME"  # Use absolute path to avoid Windows $HOME expansion
+APP_DIR="/opt/$APP_NAME"  # Install to /opt for system-wide applications
 APP_PORT="6006"  # Same port as local development
 VENV_NAME="calculator_venv"  # Specific name for virtual environment
 SERVICE_NAME="${APP_NAME}.service"
@@ -66,12 +66,13 @@ if command -v rsync &> /dev/null; then
     # Upload files to server
     ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SERVER_USER@$SERVER_IP" << 'REMOTE_EOF'
         set -e
-        APP_DIR="/home/ubuntu/calculator"
+        APP_DIR="/opt/calculator"
         APP_PORT="6006"
         SERVICE_NAME="calculator.service"
         
-        # Create app directory
-        mkdir -p "$APP_DIR"
+        # Create app directory with proper permissions
+        sudo mkdir -p "$APP_DIR"
+        sudo chown -R ubuntu:ubuntu "$APP_DIR"
         
         # Stop existing calculator service if it's running
         if sudo systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
@@ -101,11 +102,13 @@ else
     # Create tar archive and upload
     ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SERVER_USER@$SERVER_IP" << 'REMOTE_EOF'
         set -e
-        APP_DIR="/home/ubuntu/calculator"
+        APP_DIR="/opt/calculator"
         APP_PORT="6006"
         SERVICE_NAME="calculator.service"
         
-        mkdir -p "$APP_DIR"
+        # Create app directory with proper permissions
+        sudo mkdir -p "$APP_DIR"
+        sudo chown -R ubuntu:ubuntu "$APP_DIR"
         
         # Stop existing calculator service if it's running
         if sudo systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
@@ -140,7 +143,7 @@ REMOTE_EOF
         --exclude='DEVELOPMENT.md' \
         --exclude='instructions' \
         --exclude='deploy.sh' \
-        -czf - . | ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SERVER_USER@$SERVER_IP" "cd /home/ubuntu/calculator && tar -xzf -"
+        -czf - . | ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SERVER_USER@$SERVER_IP" "sudo mkdir -p /opt/calculator && sudo chown -R ubuntu:ubuntu /opt/calculator && cd /opt/calculator && tar -xzf -"
 fi
 
 echo ""
@@ -149,10 +152,14 @@ echo "🔧 Setting up application on server..."
 # Run setup commands on server
 ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SERVER_USER@$SERVER_IP" << 'REMOTE_EOF'
     set -e
-    APP_DIR="/home/ubuntu/calculator"
+    APP_DIR="/opt/calculator"
     APP_PORT="6006"
     VENV_NAME="calculator_venv"
     SERVICE_NAME="calculator.service"
+    
+    # Ensure directory exists and has proper ownership
+    sudo mkdir -p "$APP_DIR"
+    sudo chown -R ubuntu:ubuntu "$APP_DIR"
     
     cd "$APP_DIR"
     

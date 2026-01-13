@@ -195,3 +195,4 @@ If you don't have these permissions, contact your Oracle Cloud administrator.
 **View config:** `cat ~/.oci/config`
 
 
+
