@@ -11,6 +11,8 @@ export class InputSidebar {
         this.wrapper = parent; // Store reference to wrapper
         this.container = document.createElement('div');
         this.container.className = 'input-sidebar';
+        this.autoRefreshEnabled = true; // Default to enabled
+        this.autoRefreshCallback = null; // Callback to trigger calculation
         
         // Create header with toggle button (unless disabled)
         if (createHeader) {
@@ -44,6 +46,29 @@ export class InputSidebar {
         title.className = 'sidebar-title';
         header.appendChild(title);
         
+        // Create button container for header buttons
+        const buttonContainer = document.createElement('div');
+        buttonContainer.className = 'sidebar-header-buttons';
+        buttonContainer.style.cssText = 'display: flex; gap: 0.5rem; align-items: center;';
+        
+        // Create auto-refresh button
+        const autoRefreshButton = document.createElement('button');
+        autoRefreshButton.className = 'auto-refresh-btn';
+        autoRefreshButton.innerHTML = '🔄';
+        autoRefreshButton.title = 'Auto-refresh: ON';
+        autoRefreshButton.setAttribute('aria-label', 'Toggle auto-refresh');
+        autoRefreshButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggleAutoRefresh();
+        });
+        
+        // Load auto-refresh state
+        this.loadAutoRefreshState();
+        this.updateAutoRefreshButton(autoRefreshButton);
+        
+        buttonContainer.appendChild(autoRefreshButton);
+        this.autoRefreshButton = autoRefreshButton;
+        
         const toggleButton = document.createElement('button');
         toggleButton.className = 'sidebar-toggle-btn';
         toggleButton.innerHTML = '◀';
@@ -54,7 +79,8 @@ export class InputSidebar {
             this.toggleSidebar();
         });
         
-        header.appendChild(toggleButton);
+        buttonContainer.appendChild(toggleButton);
+        header.appendChild(buttonContainer);
         this.container.insertBefore(header, this.container.firstChild);
         this.toggleButton = toggleButton;
         
@@ -457,9 +483,74 @@ export class InputSidebar {
     addInputChangeListener(handler) {
         this.inputGroups.forEach(inputGroup => {
             // Only listen to 'change' and 'blur' events to avoid recalculation while typing
-            inputGroup.addEventListener('change', handler);
-            inputGroup.addEventListener('blur', handler);
+            const wrappedHandler = () => {
+                // Only trigger handler if auto-refresh is enabled
+                if (this.autoRefreshEnabled) {
+                    handler();
+                }
+            };
+            inputGroup.addEventListener('change', wrappedHandler);
+            inputGroup.addEventListener('blur', wrappedHandler);
         });
+    }
+    
+    toggleAutoRefresh(scenarioIndex = null) {
+        this.autoRefreshEnabled = !this.autoRefreshEnabled;
+        this.saveAutoRefreshState(scenarioIndex);
+        // Update button if it exists (only when createHeader is true)
+        if (this.autoRefreshButton) {
+            this.updateAutoRefreshButton(this.autoRefreshButton);
+        }
+        
+        // If auto-refresh is turned on, trigger calculation
+        if (this.autoRefreshEnabled && this.autoRefreshCallback) {
+            this.autoRefreshCallback();
+        }
+    }
+    
+    setAutoRefreshCallback(callback) {
+        this.autoRefreshCallback = callback;
+    }
+    
+    isAutoRefreshEnabled() {
+        return this.autoRefreshEnabled;
+    }
+    
+    updateAutoRefreshButton(button) {
+        if (!button) return;
+        if (this.autoRefreshEnabled) {
+            button.classList.add('auto-refresh-enabled');
+            button.classList.remove('auto-refresh-disabled');
+            button.title = 'Auto-refresh: ON';
+        } else {
+            button.classList.add('auto-refresh-disabled');
+            button.classList.remove('auto-refresh-enabled');
+            button.title = 'Auto-refresh: OFF';
+        }
+    }
+    
+    saveAutoRefreshState(scenarioIndex = null) {
+        try {
+            // If scenarioIndex is provided, save per-scenario, otherwise use global key
+            const key = scenarioIndex !== null ? `auto_refresh_enabled_scenario_${scenarioIndex}` : 'auto_refresh_enabled';
+            storage.setItem(key, JSON.stringify(this.autoRefreshEnabled));
+        } catch (error) {
+            console.warn('Failed to save auto-refresh state:', error);
+        }
+    }
+    
+    loadAutoRefreshState(scenarioIndex = null) {
+        try {
+            // If scenarioIndex is provided, load per-scenario, otherwise use global key
+            const key = scenarioIndex !== null ? `auto_refresh_enabled_scenario_${scenarioIndex}` : 'auto_refresh_enabled';
+            const savedState = storage.getItem(key);
+            if (savedState !== null) {
+                this.autoRefreshEnabled = JSON.parse(savedState);
+            }
+        } catch (error) {
+            console.warn('Failed to load auto-refresh state:', error);
+            this.autoRefreshEnabled = true; // Default to enabled
+        }
     }
     getInputValues() {
         const values = new Map();

@@ -22,12 +22,24 @@ function isProductionMode() {
 }
 
 /**
+ * Get the base path for cookies (from ProxyFix prefix if present)
+ */
+function getCookiePath() {
+    // Use injected config if available (from template), otherwise use root
+    if (window.APP_CONFIG && window.APP_CONFIG.basePath) {
+        return window.APP_CONFIG.basePath || '/';
+    }
+    return '/';
+}
+
+/**
  * Cookie utility functions
  */
 function setCookie(name, value, days = 365) {
     const expires = new Date();
     expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
-    document.cookie = `${name}=${encodeURIComponent(value)};expires=${expires.toUTCString()};path=/;SameSite=Lax`;
+    const cookiePath = getCookiePath();
+    document.cookie = `${name}=${encodeURIComponent(value)};expires=${expires.toUTCString()};path=${cookiePath};SameSite=Lax`;
 }
 
 function getCookie(name) {
@@ -44,7 +56,8 @@ function getCookie(name) {
 }
 
 function removeCookie(name) {
-    document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;`;
+    const cookiePath = getCookiePath();
+    document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=${cookiePath};`;
 }
 
 /**
@@ -150,7 +163,8 @@ class Storage {
     _setCookieRaw(name, encodedValue) {
         const expires = new Date();
         expires.setTime(expires.getTime() + (365 * 24 * 60 * 60 * 1000));
-        document.cookie = `${name}=${encodedValue};expires=${expires.toUTCString()};path=/;SameSite=Lax`;
+        const cookiePath = getCookiePath();
+        document.cookie = `${name}=${encodedValue};expires=${expires.toUTCString()};path=${cookiePath};SameSite=Lax`;
     }
 
     /**

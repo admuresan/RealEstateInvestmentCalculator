@@ -30,7 +30,7 @@ interest paid ( above this column there should be an input box for the lenght of
 maitenance fees ( abve this column there should be a input box for assumed main fee increase ( yearly))
 property tax (above this column there should be an inputbox for assumed property tax increase ( yearly))
 insurance paid (above this column there should be an input box for insurance ammount)
-utilities (above this column there should be a input box for approximate utilities ammount)
+utilities (above this column there should be a input box for approximate utilities ammou
 repairs (above this column there should be an input box for approximate reapirs)
 total expenses (this should sum the payments, maintenance, propery tax, insurance, utilities and repais ammounts)
 deductible expenses(simialr to total expenses but sum interest paid instead of payments made)

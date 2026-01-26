@@ -256,6 +256,11 @@ class InvestmentCalculator {
     setupInputChangeListeners() {
         // Listen for input changes in all scenario tabs
         this.scenarioTabs.getAllInputSidebars().forEach((inputSidebar, index) => {
+            // Set auto-refresh callback to trigger calculation when button is turned on
+            inputSidebar.setAutoRefreshCallback(() => {
+                this.performCalculationForScenario(index);
+            });
+            
             inputSidebar.addInputChangeListener(() => {
                 // Save scenarios when inputs change
                 this.scenarioTabs.saveScenarios();
@@ -263,7 +268,10 @@ class InvestmentCalculator {
                 if (this.scenarioDifferences) {
                     this.scenarioDifferences.refresh();
                 }
-                this.performCalculationForScenario(index);
+                // Only perform calculation if auto-refresh is enabled
+                if (inputSidebar.isAutoRefreshEnabled()) {
+                    this.performCalculationForScenario(index);
+                }
             });
         });
     }
@@ -308,6 +316,11 @@ class InvestmentCalculator {
                     // Wait for values to be set in addTab before setting up listeners
                     // This prevents calculations from being triggered during initial value setting
                     setTimeout(() => {
+                        // Set auto-refresh callback to trigger calculation when button is turned on
+                        tab.inputSidebar.setAutoRefreshCallback(() => {
+                            this.performCalculationForScenario(newTabIndex);
+                        });
+                        
                         // Set up input change listener AFTER values are set
                         // This ensures calculations only run when user makes changes, not during initial setup
                         tab.inputSidebar.addInputChangeListener(() => {
@@ -317,8 +330,10 @@ class InvestmentCalculator {
                             if (this.scenarioDifferences) {
                                 this.scenarioDifferences.refresh();
                             }
-                            // Perform calculation for this scenario
-                            this.performCalculationForScenario(newTabIndex);
+                            // Perform calculation for this scenario only if auto-refresh is enabled
+                            if (tab.inputSidebar.isAutoRefreshEnabled()) {
+                                this.performCalculationForScenario(newTabIndex);
+                            }
                         });
                         
                         // Wait for values to be fully set and display tab to be fully initialized

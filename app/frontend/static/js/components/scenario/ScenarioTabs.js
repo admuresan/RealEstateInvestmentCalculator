@@ -291,6 +291,9 @@ export class ScenarioTabs {
                 
                 if (activeIndex >= 0 && activeIndex < this.tabs.length) {
                     this.setActiveTab(activeIndex);
+                } else if (this.tabs.length > 0) {
+                    // Update button state even if activeIndex is invalid
+                    this.updateAutoRefreshButton();
                 }
                 // Notify that scenarios are loaded - this will create display tabs
                 if (this.onScenariosLoadedCallback) {
@@ -497,6 +500,25 @@ export class ScenarioTabs {
         title.className = 'sidebar-title';
         this.sharedHeader.appendChild(title);
         
+        // Create button container for header buttons
+        const buttonContainer = document.createElement('div');
+        buttonContainer.className = 'sidebar-header-buttons';
+        buttonContainer.style.cssText = 'display: flex; gap: 0.5rem; align-items: center;';
+        
+        // Create auto-refresh button
+        const autoRefreshButton = document.createElement('button');
+        autoRefreshButton.className = 'auto-refresh-btn';
+        autoRefreshButton.innerHTML = '🔄';
+        autoRefreshButton.title = 'Auto-refresh: ON';
+        autoRefreshButton.setAttribute('aria-label', 'Toggle auto-refresh');
+        autoRefreshButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggleAutoRefresh();
+        });
+        
+        buttonContainer.appendChild(autoRefreshButton);
+        this.autoRefreshButton = autoRefreshButton;
+        
         const toggleButton = document.createElement('button');
         toggleButton.className = 'sidebar-toggle-btn';
         toggleButton.innerHTML = '◀';
@@ -507,7 +529,8 @@ export class ScenarioTabs {
             this.toggleSidebar();
         });
         
-        this.sharedHeader.appendChild(toggleButton);
+        buttonContainer.appendChild(toggleButton);
+        this.sharedHeader.appendChild(buttonContainer);
         this.container.appendChild(this.sharedHeader);
         this.toggleButton = toggleButton;
         
@@ -746,6 +769,9 @@ export class ScenarioTabs {
         // Create InputSidebar instance without header
         const inputSidebar = new InputSidebar(sidebarContentWrapper, false);
         
+        // Load auto-refresh state for this scenario
+        inputSidebar.loadAutoRefreshState(tabIndex);
+        
         // Set up save callback for this input sidebar
         // Use setTimeout to ensure input groups are fully initialized
         setTimeout(() => {
@@ -812,6 +838,22 @@ export class ScenarioTabs {
         return Promise.resolve(tabInfo);
     }
 
+    toggleAutoRefresh() {
+        const activeTab = this.tabs[this.activeTabIndex];
+        if (activeTab && activeTab.inputSidebar) {
+            activeTab.inputSidebar.toggleAutoRefresh(this.activeTabIndex);
+            this.updateAutoRefreshButton();
+        }
+    }
+    
+    updateAutoRefreshButton() {
+        if (!this.autoRefreshButton) return;
+        const activeTab = this.tabs[this.activeTabIndex];
+        if (activeTab && activeTab.inputSidebar) {
+            activeTab.inputSidebar.updateAutoRefreshButton(this.autoRefreshButton);
+        }
+    }
+    
     setActiveTab(index) {
         if (index < 0 || index >= this.tabs.length) return;
         
@@ -820,6 +862,9 @@ export class ScenarioTabs {
         
         // Update active state
         this.activeTabIndex = index;
+        
+        // Update auto-refresh button to reflect active scenario's state
+        this.updateAutoRefreshButton();
         
         // Update buttons
         this.tabs.forEach((tab, i) => {

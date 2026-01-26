@@ -1,6 +1,6 @@
 """
 Production runner for Real Estate Investment Calculator.
-This file is created on the server during deployment.
+Configured to run on localhost:6006 for AppManager proxy compatibility.
 """
 
 import os
@@ -21,6 +21,10 @@ if __name__ == '__main__':
     # Production settings - port from environment variable or default to 6006 (same as local)
     port = int(os.environ.get('PORT', 6006))
     
-    print(f"Starting Real Estate Investment Calculator on port {port}...")
-    app.run(host='0.0.0.0', port=port, debug=False)
+    # Use 127.0.0.1 when behind AppManager proxy (recommended for security)
+    # Use 0.0.0.0 if the app needs to be accessible from outside the host
+    host = os.environ.get('HOST', '127.0.0.1')
+    
+    print(f"Starting Real Estate Investment Calculator on {host}:{port}...")
+    app.run(host=host, port=port, debug=False)
 

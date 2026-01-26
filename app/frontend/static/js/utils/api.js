@@ -2,10 +2,23 @@
  * API utility functions for communicating with the backend.
  */
 /**
+ * Get the API base URL, accounting for ProxyFix prefix if present.
+ */
+function getApiBaseUrl() {
+    // Use injected config if available (from template), otherwise fall back to relative path
+    if (window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) {
+        return window.APP_CONFIG.apiBaseUrl;
+    }
+    // Fallback to relative path which will work with ProxyFix
+    return './api';
+}
+
+/**
  * Send calculation request to the backend API.
  */
 export async function calculateInvestment(params) {
-    const response = await fetch('/api/calculate', {
+    const apiBaseUrl = getApiBaseUrl();
+    const response = await fetch(`${apiBaseUrl}/calculate`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

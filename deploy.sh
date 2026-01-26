@@ -211,27 +211,9 @@ ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SERVER_USER@$SERVER_IP" << 'REMO
         echo "✅ Virtual environment created and requirements file saved."
     fi
     
-    echo "📝 Creating production app runner..."
-    cat > run_production.py << 'PYEOF'
-import os
-import sys
-
-# Add the app directory to Python path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-# Remove conflicting 'app' module if it exists
-if 'app' in sys.modules and not hasattr(sys.modules['app'], '__path__'):
-    del sys.modules['app']
-
-from app.backend.app import create_app
-
-app = create_app()
-
-if __name__ == '__main__':
-    # Production settings
-    port = int(os.environ.get('PORT', 6006))
-    app.run(host='0.0.0.0', port=port, debug=False)
-PYEOF
+    echo "📝 Using production app runner from repository..."
+    # The run_production.py file is already in the repo and will be deployed
+    # It's configured to use 127.0.0.1 (localhost) by default for AppManager proxy compatibility
     
     echo "⚙️  Creating systemd service..."
     sudo tee /etc/systemd/system/$SERVICE_NAME > /dev/null << SERVICEEOF
