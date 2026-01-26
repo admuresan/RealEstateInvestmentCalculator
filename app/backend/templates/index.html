@@ -16,13 +16,39 @@
     </script>
 </head>
 <body>
-    <div id="app">
-        <header class="app-header">
-            <h1>Real Estate Investment Calculator</h1>
-            <p class="subtitle">Analyze your real estate investment over time</p>
-        </header>
-    </div>
+    <header class="app-header">
+        <div>
+            <div class="header-title">
+                <h1>Real Estate Investment Calculator</h1>
+                <p class="subtitle">Analyze your real estate investment over time</p>
+            </div>
+            <button id="feature-request-btn" class="feature-request-btn" title="Request Features or Tips">
+                💡 Request Features/Tip
+            </button>
+        </div>
+    </header>
+    <div id="app"></div>
     <script type="module" src="{{ url_for('static', filename='static/js/main.js') }}"></script>
+    <script>
+        // Feature Request button handler
+        (function() {
+            const btn = document.getElementById('feature-request-btn');
+            if (btn) {
+                btn.addEventListener('click', function() {
+                    // Get FeatureRequestor URL from environment variable or use default
+                    const featureRequestorUrl = window.FEATURE_REQUESTOR_URL || 
+                        (window.location.origin.includes('localhost') 
+                            ? 'http://localhost:6003' 
+                            : 'https://featurerequestor.yourdomain.com');
+                    
+                    // Open feature requests page for calculator app
+                    const appName = 'calculator';
+                    const url = featureRequestorUrl + '/feature-requests?app=' + appName;
+                    window.open(url, '_blank');
+                });
+            }
+        })();
+    </script>
 </body>
 </html>
 

@@ -764,8 +764,29 @@ class InvestmentCalculator {
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
         new InvestmentCalculator();
+        initFeatureRequestButton();
     });
 }
 else {
     new InvestmentCalculator();
+    initFeatureRequestButton();
+}
+
+// Feature Request button handler
+function initFeatureRequestButton() {
+    const btn = document.getElementById('feature-request-btn');
+    if (btn) {
+        btn.addEventListener('click', () => {
+            // Get FeatureRequestor URL from environment variable or use default
+            const featureRequestorUrl = window.FEATURE_REQUESTOR_URL || 
+                (window.location.origin.includes('localhost') 
+                    ? 'http://localhost:6003' 
+                    : 'https://featurerequestor.yourdomain.com');
+            
+            // Open feature requests page for calculator app
+            const appName = 'calculator';
+            const url = `${featureRequestorUrl}/feature-requests?app=${appName}`;
+            window.open(url, '_blank');
+        });
+    }
 }

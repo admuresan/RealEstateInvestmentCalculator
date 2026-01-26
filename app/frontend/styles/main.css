@@ -32,16 +32,80 @@ body {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     padding: 1rem;
-    text-align: center;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     position: sticky;
     top: 0;
     z-index: 100;
+    width: 100%;
+}
+
+.app-header > div {
+    max-width: 1400px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    position: relative;
+}
+
+.app-header .header-title {
+    flex: 1;
+    text-align: center;
 }
 
 .app-header h1 {
     font-size: 1.25rem;
     margin-bottom: 0.25rem;
+    text-align: center;
+}
+
+.app-header .subtitle {
+    text-align: center;
+}
+
+.feature-request-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    backdrop-filter: blur(10px);
+    flex-shrink: 0;
+    z-index: 10;
+}
+
+.feature-request-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.feature-request-btn:active {
+    transform: translateY(0);
+}
+
+@media (max-width: 768px) {
+    .app-header > div {
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .app-header .header-title {
+        width: 100%;
+    }
+    
+    .feature-request-btn {
+        padding: 0.4rem 0.8rem;
+        font-size: 0.8rem;
+    }
 }
 
 .subtitle {
