@@ -13,6 +13,8 @@
             basePath: '{{ request.script_root }}' || '',
             apiBaseUrl: ('{{ request.script_root }}' || '') + '/api'
         };
+        // Inject Feature Requestor URL for feature request button
+        window.FEATURE_REQUESTOR_URL = '{{ feature_requestor_url }}';
     </script>
 </head>
 <body>
@@ -35,11 +37,11 @@
             const btn = document.getElementById('feature-request-btn');
             if (btn) {
                 btn.addEventListener('click', function() {
-                    // Get FeatureRequestor URL from environment variable or use default
+                    // Get FeatureRequestor URL from injected variable or fallback
                     const featureRequestorUrl = window.FEATURE_REQUESTOR_URL || 
                         (window.location.origin.includes('localhost') 
                             ? 'http://localhost:6003' 
-                            : 'https://featurerequestor.yourdomain.com');
+                            : 'https://blackgrid.ddns.net/feature-requestor');
                     
                     // Open feature requests page for calculator app
                     const appName = 'calculator';

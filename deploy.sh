@@ -216,6 +216,11 @@ ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SERVER_USER@$SERVER_IP" << 'REMO
     # It's configured to use 127.0.0.1 (localhost) by default for AppManager proxy compatibility
     
     echo "⚙️  Creating systemd service..."
+    # Set Feature Requestor URL - prefer AppManager domain route, fallback to direct port
+    FEATURE_REQUESTOR_URL="${FEATURE_REQUESTOR_URL:-https://blackgrid.ddns.net/feature-requestor}"
+    SERVER_DOMAIN="${SERVER_DOMAIN:-blackgrid.ddns.net}"
+    SERVER_IP="${SERVER_IP:-40.233.70.245}"
+    
     sudo tee /etc/systemd/system/$SERVICE_NAME > /dev/null << SERVICEEOF
 [Unit]
 Description=Real Estate Investment Calculator
@@ -227,6 +232,9 @@ User=ubuntu
 WorkingDirectory=$APP_DIR
 Environment="PATH=$APP_DIR/$VENV_NAME/bin"
 Environment="PORT=$APP_PORT"
+Environment="FEATURE_REQUESTOR_URL=$FEATURE_REQUESTOR_URL"
+Environment="SERVER_DOMAIN=$SERVER_DOMAIN"
+Environment="SERVER_IP=$SERVER_IP"
 ExecStart=$APP_DIR/$VENV_NAME/bin/python $APP_DIR/run_production.py
 Restart=always
 RestartSec=10

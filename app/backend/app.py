@@ -44,7 +44,19 @@ def create_app():
     def index():
         """Serve the main HTML page."""
         from flask import render_template
-        return render_template('index.html')
+        # Get Feature Requestor URL from environment variable
+        # Default to server IP with port 6003, or use AppManager domain if available
+        feature_requestor_url = os.environ.get('FEATURE_REQUESTOR_URL')
+        if not feature_requestor_url:
+            # Try to construct from server domain or IP
+            server_domain = os.environ.get('SERVER_DOMAIN', 'blackgrid.ddns.net')
+            server_ip = os.environ.get('SERVER_IP', '40.233.70.245')
+            # Prefer domain over IP, and use https if not localhost
+            if server_domain and server_domain != 'localhost':
+                feature_requestor_url = f'https://{server_domain}/feature-requestor'
+            else:
+                feature_requestor_url = f'http://{server_ip}:6003'
+        return render_template('index.html', feature_requestor_url=feature_requestor_url)
     
     # Debug endpoints for testing ProxyFix configuration
     @app.route('/debug/proxy')
