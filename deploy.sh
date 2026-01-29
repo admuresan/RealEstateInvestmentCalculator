@@ -33,6 +33,9 @@ fi
 # Set proper permissions for SSH key
 chmod 600 "$SSH_KEY"
 
+# SSH options - suppress MOTD/login messages
+SSH_OPTS="-i $SSH_KEY -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o BatchMode=yes"
+
 echo "📦 Preparing deployment package..."
 
 # Check if rsync is available, otherwise use tar+scp
@@ -55,8 +58,6 @@ if command -v rsync &> /dev/null; then
         --exclude='*.bat' \
         --exclude='find_python.bat' \
         --exclude='ssh' \
-        --exclude='*.md' \
-        --exclude='DEVELOPMENT.md' \
         --exclude='instructions' \
         ./ "$DEPLOY_DIR/"
     
@@ -64,7 +65,7 @@ if command -v rsync &> /dev/null; then
     echo "🚀 Uploading files to server..."
     
     # Upload files to server
-    ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SERVER_USER@$SERVER_IP" << 'REMOTE_EOF'
+    ssh $SSH_OPTS "$SERVER_USER@$SERVER_IP" << 'REMOTE_EOF'
         set -e
         APP_DIR="/opt/calculator"
         APP_PORT="6006"
@@ -90,7 +91,7 @@ if command -v rsync &> /dev/null; then
 REMOTE_EOF
     
     # Copy files to server
-    rsync -avz --progress -e "ssh -i $SSH_KEY -o StrictHostKeyChecking=no" \
+    rsync -avz --progress -e "ssh $SSH_OPTS" \
         "$DEPLOY_DIR/" "$SERVER_USER@$SERVER_IP:$APP_DIR/"
     
     # Clean up temp directory
@@ -100,7 +101,7 @@ else
     echo "🚀 Uploading files to server..."
     
     # Create tar archive and upload
-    ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SERVER_USER@$SERVER_IP" << 'REMOTE_EOF'
+    ssh $SSH_OPTS "$SERVER_USER@$SERVER_IP" << 'REMOTE_EOF'
         set -e
         APP_DIR="/opt/calculator"
         APP_PORT="6006"
@@ -139,18 +140,16 @@ REMOTE_EOF
         --exclude='*.bat' \
         --exclude='find_python.bat' \
         --exclude='ssh' \
-        --exclude='*.md' \
-        --exclude='DEVELOPMENT.md' \
         --exclude='instructions' \
         --exclude='deploy.sh' \
-        -czf - . | ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SERVER_USER@$SERVER_IP" "sudo mkdir -p /opt/calculator && sudo chown -R ubuntu:ubuntu /opt/calculator && cd /opt/calculator && tar -xzf -"
+        -czf - . | ssh $SSH_OPTS "$SERVER_USER@$SERVER_IP" "sudo mkdir -p /opt/calculator && sudo chown -R ubuntu:ubuntu /opt/calculator && cd /opt/calculator && tar -xzf -"
 fi
 
 echo ""
 echo "🔧 Setting up application on server..."
 
 # Run setup commands on server
-ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SERVER_USER@$SERVER_IP" << 'REMOTE_EOF'
+ssh $SSH_OPTS "$SERVER_USER@$SERVER_IP" << 'REMOTE_EOF'
     set -e
     APP_DIR="/opt/calculator"
     APP_PORT="6006"
@@ -216,8 +215,9 @@ ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SERVER_USER@$SERVER_IP" << 'REMO
     # It's configured to use 127.0.0.1 (localhost) by default for AppManager proxy compatibility
     
     echo "⚙️  Creating systemd service..."
-    # Set Feature Requestor URL - prefer AppManager domain route, fallback to direct port
-    FEATURE_REQUESTOR_URL="${FEATURE_REQUESTOR_URL:-https://blackgrid.ddns.net/feature-requestor}"
+    # Set Feature Requestor URL - use direct port access (domain:port model)
+    FEATURE_REQUESTOR_PORT="${FEATURE_REQUESTOR_PORT:-6003}"
+    FEATURE_REQUESTOR_URL="${FEATURE_REQUESTOR_URL:-http://${SERVER_DOMAIN}:${FEATURE_REQUESTOR_PORT}}"
     SERVER_DOMAIN="${SERVER_DOMAIN:-blackgrid.ddns.net}"
     SERVER_IP="${SERVER_IP:-40.233.70.245}"
     

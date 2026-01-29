@@ -789,4 +789,39 @@ function initFeatureRequestButton() {
             window.open(url, '_blank');
         });
     }
+    
+    // Position feature request button at bottom of window when window is larger than page
+    const footer = document.querySelector('.feature-request-footer');
+    if (footer) {
+        function updateButtonPosition() {
+            const windowHeight = window.innerHeight;
+            const documentHeight = Math.max(
+                document.body.scrollHeight,
+                document.body.offsetHeight,
+                document.documentElement.clientHeight,
+                document.documentElement.scrollHeight,
+                document.documentElement.offsetHeight
+            );
+            
+            if (windowHeight > documentHeight) {
+                footer.classList.add('fixed-bottom');
+            } else {
+                footer.classList.remove('fixed-bottom');
+            }
+        }
+        
+        // Update on load and resize
+        updateButtonPosition();
+        window.addEventListener('resize', updateButtonPosition);
+        window.addEventListener('load', updateButtonPosition);
+        
+        // Also update when content changes (e.g., dynamic content loading)
+        const observer = new MutationObserver(updateButtonPosition);
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['style', 'class']
+        });
+    }
 }
