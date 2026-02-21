@@ -14,6 +14,7 @@ def create_app():
     # Get the path to the frontend folder relative to this file
     backend_dir = os.path.dirname(os.path.abspath(__file__))
     app_root_dir = os.path.dirname(backend_dir)
+    project_root_dir = os.path.dirname(app_root_dir)  # Calculator repo root (logo.png lives here)
     frontend_dir = os.path.join(os.path.dirname(backend_dir), 'frontend')
     templates_dir = os.path.join(backend_dir, 'templates')
     
@@ -27,6 +28,7 @@ def create_app():
 
     # Cookie isolation: multiple apps share the same domain, so cookie names must be unique per app.
     app.config['SESSION_COOKIE_NAME'] = os.environ.get('SESSION_COOKIE_NAME', 'calculator_session')
+    app.config['SESSION_COOKIE_PATH'] = os.environ.get('APPLICATION_ROOT', '') or '/'
     
     # CRITICAL: Configure ProxyFix BEFORE CORS and routes
     # This allows the app to work properly when proxied by AppManager
@@ -44,38 +46,37 @@ def create_app():
     # Register blueprints
     app.register_blueprint(api_bp, url_prefix='/api')
 
-    @app.route('/CalculatorIcon.png')
-    def calculator_icon_png():
-        """Serve the calculator icon PNG (used for favicon)."""
-        return send_from_directory(app_root_dir, 'CalculatorIcon.png', mimetype='image/png')
-
     @app.route('/favicon.png')
     def favicon_png():
-        """Serve a standard favicon path (PNG)."""
-        return redirect(url_for('calculator_icon_png'))
+        """Serve logo.png from project root as tab icon."""
+        return send_from_directory(project_root_dir, 'logo.png', mimetype='image/png')
 
     @app.route('/favicon.ico')
     def favicon_ico():
         """Serve a standard favicon path (ICO) by redirecting to PNG."""
-        return redirect(url_for('calculator_icon_png'))
+        return redirect(url_for('favicon_png'))
     
     @app.route('/')
     def index():
         """Serve the main HTML page."""
         from flask import render_template
-        # Get Feature Requestor URL from environment variable
-        # Default to domain:port (direct port access model)
+        # Get Feature Requestor URL: prefer env; when behind path proxy use path-based URL
         feature_requestor_url = os.environ.get('FEATURE_REQUESTOR_URL')
         if not feature_requestor_url:
-            # Try to construct from server domain or IP
-            server_domain = os.environ.get('SERVER_DOMAIN', 'blackgrid.ddns.net')
-            server_ip = os.environ.get('SERVER_IP', '40.233.70.245')
-            feature_requestor_port = int(os.environ.get('FEATURE_REQUESTOR_PORT', '6003'))
-            # Prefer domain over IP
-            if server_domain and server_domain != 'localhost':
-                feature_requestor_url = f'http://{server_domain}:{feature_requestor_port}'
+            app_root = os.environ.get('APPLICATION_ROOT', '').strip('/')
+            if app_root:
+                # Path-based routing: same domain, path /feature-requestor
+                server_domain = os.environ.get('SERVER_DOMAIN', request.host.split(':')[0] if request else 'blackgrid.ddns.net')
+                scheme = 'https' if (request and request.is_secure) else os.environ.get('PREFERRED_URL_SCHEME', 'https')
+                feature_requestor_url = f'{scheme}://{server_domain}/feature-requestor'
             else:
-                feature_requestor_url = f'http://{server_ip}:{feature_requestor_port}'
+                server_domain = os.environ.get('SERVER_DOMAIN', 'blackgrid.ddns.net')
+                server_ip = os.environ.get('SERVER_IP', '40.233.70.245')
+                feature_requestor_port = int(os.environ.get('FEATURE_REQUESTOR_PORT', '6003'))
+                if server_domain and server_domain != 'localhost':
+                    feature_requestor_url = f'http://{server_domain}:{feature_requestor_port}'
+                else:
+                    feature_requestor_url = f'http://{server_ip}:{feature_requestor_port}'
         return render_template('index.html', feature_requestor_url=feature_requestor_url)
     
     # Debug endpoints for testing ProxyFix configuration
@@ -106,6 +107,8 @@ def create_app():
 
 
 if __name__ == '__main__':
+    import os
     app = create_app()
-    app.run(host='0.0.0.0', port=6006, debug=True)
+    debug = os.environ.get('FLASK_ENV') != 'production'
+    app.run(host='0.0.0.0', port=6006, debug=debug)
 

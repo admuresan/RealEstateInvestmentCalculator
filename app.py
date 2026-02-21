@@ -68,5 +68,6 @@ if __name__ == '__main__':
     print("\n✅ Flask API server starting at http://localhost:6006")
     print("💡 For development, run 'npm run dev' in another terminal to start Vite dev server")
     print("   Then access the app at http://localhost:5173\n")
-    app.run(host='0.0.0.0', port=6006, debug=True)
+    debug = os.environ.get('FLASK_ENV') != 'production'
+    app.run(host='0.0.0.0', port=6006, debug=debug)
 
